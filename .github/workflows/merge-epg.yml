@@ -34,20 +34,18 @@ jobs:
           import glob
           import gzip
           from datetime import datetime, timedelta
-          from collections import OrderedDict
 
           def parse_epg_content(content):
-              channels = OrderedDict()
+              channels = {}
               programmes = []
               
-              channel_pattern = r'<channel id="([^"]+)"[^>]*>(.*?)</channel>'
+              channel_pattern = r'<channel\s+id="([^"]+)"[^>]*>.*?</channel>'
               for match in re.finditer(channel_pattern, content, re.DOTALL):
                   channel_id = match.group(1)
-                  channel_xml = match.group(0)
                   if channel_id not in channels:
-                      channels[channel_id] = channel_xml
+                      channels[channel_id] = match.group(0)
               
-              programme_pattern = r'<programme[^>]*>(.*?)</programme>'
+              programme_pattern = r'<programme\s+[^>]*>.*?</programme>'
               for match in re.finditer(programme_pattern, content, re.DOTALL):
                   prog_xml = match.group(0)
                   channel_match = re.search(r'channel="([^"]+)"', prog_xml)
@@ -61,35 +59,56 @@ jobs:
               
               return channels, programmes
 
+          def format_xml_block(xml_string):
+              # 1. Clean up random/bad spacing from original source files
+              xml_string = re.sub(r'>\s+<', '><', xml_string.strip())
+              
+              # 2. Force standardized line breaks for SAX Parsers
+              xml_string = xml_string.replace('><', '>\n<')
+              
+              # 3. Apply perfect 2-space and 4-space indentation exactly like your sample
+              lines = xml_string.split('\n')
+              formatted_lines = []
+              for i, line in enumerate(lines):
+                  if i == 0 or i == len(lines) - 1:
+                      # Outer tags (e.g. <channel...> and </channel>) get 2 spaces
+                      formatted_lines.append("  " + line)
+                  else:
+                      # Inner tags (e.g. <title...>, <desc...>) get 4 spaces
+                      formatted_lines.append("    " + line)
+                      
+              return '\n'.join(formatted_lines)
+
           def write_compressed_file(xml_content, output_path):
-              # GZIP compresses perfectly without needing to strip newlines
               xml_bytes = xml_content.encode('utf-8')
               compressed_data = gzip.compress(xml_bytes, compresslevel=9, mtime=0)
               
               with open(output_path, 'wb') as f:
                   f.write(compressed_data)
-              
-              return {
-                  'original_size': len(xml_bytes),
-                  'compressed_size': len(compressed_data)
-              }
 
           def build_xml(channels, programmes):
-              # CRITICAL FIX: Sort by Channel FIRST, then by Start Time.
-              # This stops IPTV players from freezing during parsing.
+              # CRITICAL: Sort programmes by channel so they are grouped sequentially!
               programmes.sort(key=lambda x: (x['channel'], x['start']))
               
-              # CRITICAL FIX: Keep line breaks (\n). 
-              # TV apps read line-by-line to save memory.
-              xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n<tv>']
+              # Sort channels alphabetically to match programme blocks
+              sorted_channel_ids = sorted(channels.keys())
               
-              for ch_xml in channels.values():
-                  xml_parts.append(ch_xml.strip())
+              # Standard XMLTV Header
+              xml_parts = [
+                  '<?xml version="1.0" encoding="UTF-8"?>',
+                  '<tv generator-info-name="SmartEPG">'
+              ]
               
+              # Inject perfectly formatted Channel blocks first
+              for ch_id in sorted_channel_ids:
+                  xml_parts.append(format_xml_block(channels[ch_id]))
+              
+              # Inject perfectly formatted Programme blocks next
               for prog in programmes:
-                  xml_parts.append(prog['xml'].strip())
+                  xml_parts.append(format_xml_block(prog['xml']))
               
               xml_parts.append('</tv>\n')
+              
               return '\n'.join(xml_parts)
 
           def main():
@@ -101,31 +120,22 @@ jobs:
               today_str = today.strftime('%Y-%m-%d')
               tomorrow_str = (today + timedelta(days=1)).strftime('%Y-%m-%d')
               
-              full_channels = OrderedDict()
+              full_channels = {}
               full_programmes_dict = {} 
               
-              live_channels = OrderedDict()
+              live_channels = {}
               live_programmes_dict = {} 
               
-              # 1. Process Catchup files (Day0Catchup to Day6Catchup) -> FULL EPG ONLY
-              print("\n" + "=" * 70)
-              print("📂 PROCESSING CATCHUP (ALL CHANNELS FROM DAY 0 TO 6)")
-              print("=" * 70)
-              
+              # 1. Process Catchup files (Day0Catchup to Day6Catchup)
               catchup_files_found = 0
               catchup_progs_added = 0
               
-              # Strictly 7 days (0 through 6)
               for i in range(7):
                   filename = f"Day{i}Catchup.xml"
                   path_in_epg = os.path.join("Epg", filename)
                   path_in_root = filename
                   
-                  file_path = None
-                  if os.path.exists(path_in_epg):
-                      file_path = path_in_epg
-                  elif os.path.exists(path_in_root):
-                      file_path = path_in_root
+                  file_path = path_in_epg if os.path.exists(path_in_epg) else (path_in_root if os.path.exists(path_in_root) else None)
                       
                   if file_path:
                       catchup_files_found += 1
@@ -134,10 +144,8 @@ jobs:
                               content = f.read()
                           
                           channels, programmes = parse_epg_content(content)
-                          
                           for ch_id, ch_xml in channels.items():
-                              if ch_id not in full_channels:
-                                  full_channels[ch_id] = ch_xml
+                              full_channels[ch_id] = ch_xml
                                   
                           for prog in programmes:
                               prog_key = (prog['channel'], prog['start'])
@@ -147,101 +155,45 @@ jobs:
                           print(f"  ✓ {file_path} -> Added {len(programmes)} programmes")
                       except Exception as e:
                           print(f"  ✗ Error reading {file_path}: {e}")
-                  else:
-                      print(f"  ⚠️ Not found: {filename}")
-                      
-              # 2. Process Today -> FULL and LIVE EPG
-              print("\n" + "=" * 70)
-              print(f"📂 PROCESSING TODAY ({today_str})")
-              print("=" * 70)
               
-              today_files = sorted(glob.glob(f"Epg/{today_str}*.xml"))
-              if not today_files:
-                  print(f"  ⚠️ No standard files found for today ({today_str})")
-                  
-              for file_path in today_files:
-                  try:
-                      with open(file_path, 'r', encoding='utf-8') as f:
-                          content = f.read()
-                      
-                      channels, programmes = parse_epg_content(content)
-                      print(f"  📅 {today_str}: {os.path.basename(file_path)} ({len(channels)} channels, {len(programmes)} programmes)")
-                      
-                      for ch_id, ch_xml in channels.items():
-                          if ch_id not in full_channels: full_channels[ch_id] = ch_xml
-                          if ch_id not in live_channels: live_channels[ch_id] = ch_xml
-                      
-                      for prog in programmes:
-                          prog_key = (prog['channel'], prog['start'])
-                          full_programmes_dict[prog_key] = prog
-                          live_programmes_dict[prog_key] = prog
+              # 2. Process Today & Tomorrow files
+              for target_date in [today_str, tomorrow_str]:
+                  files = sorted(glob.glob(f"Epg/{target_date}*.xml"))
+                  for file_path in files:
+                      try:
+                          with open(file_path, 'r', encoding='utf-8') as f:
+                              content = f.read()
                           
-                  except Exception as e:
-                      print(f"    ✗ Error: {e}")
-              
-              # 3. Process Tomorrow -> FULL and LIVE EPG
-              print("\n" + "=" * 70)
-              print(f"📂 PROCESSING TOMORROW ({tomorrow_str})")
-              print("=" * 70)
-              
-              tomorrow_files = sorted(glob.glob(f"Epg/{tomorrow_str}*.xml"))
-              if not tomorrow_files:
-                  print(f"  ⚠️ No standard files found for tomorrow ({tomorrow_str})")
-                  
-              for file_path in tomorrow_files:
-                  try:
-                      with open(file_path, 'r', encoding='utf-8') as f:
-                          content = f.read()
-                      
-                      channels, programmes = parse_epg_content(content)
-                      print(f"  📅 {tomorrow_str}: {os.path.basename(file_path)} ({len(channels)} channels, {len(programmes)} programmes)")
-                      
-                      for ch_id, ch_xml in channels.items():
-                          if ch_id not in full_channels: full_channels[ch_id] = ch_xml
-                          if ch_id not in live_channels: live_channels[ch_id] = ch_xml
-                      
-                      for prog in programmes:
-                          prog_key = (prog['channel'], prog['start'])
-                          full_programmes_dict[prog_key] = prog
-                          live_programmes_dict[prog_key] = prog
+                          channels, programmes = parse_epg_content(content)
+                          print(f"  📅 {target_date}: {os.path.basename(file_path)} ({len(programmes)} programmes)")
                           
-                  except Exception as e:
-                      print(f"    ✗ Error: {e}")
+                          for ch_id, ch_xml in channels.items():
+                              full_channels[ch_id] = ch_xml
+                              live_channels[ch_id] = ch_xml
+                          
+                          for prog in programmes:
+                              prog_key = (prog['channel'], prog['start'])
+                              full_programmes_dict[prog_key] = prog
+                              live_programmes_dict[prog_key] = prog
+                              
+                      except Exception as e:
+                          print(f"    ✗ Error: {e}")
               
-              # Output Generation
-              print("\n" + "=" * 70)
-              print("📝 GENERATING OUTPUT FILES")
-              print("=" * 70)
-              
+              # Build and write final outputs
               full_programmes = list(full_programmes_dict.values())
               live_programmes = list(live_programmes_dict.values())
 
               if full_programmes:
-                  print("\n📦 Building Full EPG (Catchup + Today + Tomorrow)...")
+                  print("\n📦 Building Full EPG...")
                   build_xml_content = build_xml(full_channels, full_programmes)
                   write_compressed_file(build_xml_content, 'Epg.xml.gz')
-                  print(f"  ✓ Full EPG compressed!")
               
               if live_programmes:
-                  print("\n📦 Building Live EPG (Today + Tomorrow only)...")
+                  print("📦 Building Live EPG...")
                   build_xml_content = build_xml(live_channels, live_programmes)
                   write_compressed_file(build_xml_content, 'LiveEpg.xml.gz')
-                  print(f"  ✓ Live EPG compressed!")
               
-              print(f"\n{'=' * 70}")
-              print("✅ MERGE SUMMARY")
-              print(f"{'=' * 70}")
-              print(f"  Catchup Files Found: {catchup_files_found}/7")
-              print(f"  Catchup Programmes Added: {catchup_progs_added}")
-              print(f"  Live Programmes Total: {len(live_programmes)}")
-              print(f"  Full Programmes Total: {len(full_programmes)}")
-              
-              if os.path.exists('Epg.xml.gz'):
-                  size = os.path.getsize('Epg.xml.gz')
-                  print(f"\n  Final Epg.xml.gz: {size/1024/1024:.2f} MB")
-              if os.path.exists('LiveEpg.xml.gz'):
-                  size = os.path.getsize('LiveEpg.xml.gz')
-                  print(f"  Final LiveEpg.xml.gz: {size/1024/1024:.2f} MB")
+              print("✅ Process Completed Successfully!")
 
           if __name__ == "__main__":
               main()
