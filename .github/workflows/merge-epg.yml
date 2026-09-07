@@ -61,17 +61,9 @@ jobs:
               
               return channels, programmes
 
-          def optimize_xml_size(xml_content):
-              xml_content = re.sub(r'>\s+<', '><', xml_content)
-              xml_content = re.sub(r'>\s+', '>', xml_content)
-              xml_content = re.sub(r'\s+<', '<', xml_content)
-              xml_content = re.sub(r'\n\s*\n', '\n', xml_content)
-              xml_content = re.sub(r'\s+', ' ', xml_content)
-              return xml_content
-
           def write_compressed_file(xml_content, output_path):
-              optimized_xml = optimize_xml_size(xml_content)
-              xml_bytes = optimized_xml.encode('utf-8')
+              # GZIP compresses perfectly without needing to strip newlines
+              xml_bytes = xml_content.encode('utf-8')
               compressed_data = gzip.compress(xml_bytes, compresslevel=9, mtime=0)
               
               with open(output_path, 'wb') as f:
@@ -83,16 +75,21 @@ jobs:
               }
 
           def build_xml(channels, programmes):
-              programmes.sort(key=lambda x: x['start'])
+              # CRITICAL FIX: Sort by Channel FIRST, then by Start Time.
+              # This stops IPTV players from freezing during parsing.
+              programmes.sort(key=lambda x: (x['channel'], x['start']))
+              
+              # CRITICAL FIX: Keep line breaks (\n). 
+              # TV apps read line-by-line to save memory.
               xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>\n<tv>']
               
               for ch_xml in channels.values():
-                  xml_parts.append(re.sub(r'\s+', ' ', ch_xml.strip()))
+                  xml_parts.append(ch_xml.strip())
               
               for prog in programmes:
-                  xml_parts.append(re.sub(r'\s+', ' ', prog['xml'].strip()))
+                  xml_parts.append(prog['xml'].strip())
               
-              xml_parts.append('</tv>')
+              xml_parts.append('</tv>\n')
               return '\n'.join(xml_parts)
 
           def main():
@@ -121,7 +118,6 @@ jobs:
               # Strictly 7 days (0 through 6)
               for i in range(7):
                   filename = f"Day{i}Catchup.xml"
-                  # Bulletproof check for both repo root or inside Epg/ directory
                   path_in_epg = os.path.join("Epg", filename)
                   path_in_root = filename
                   
