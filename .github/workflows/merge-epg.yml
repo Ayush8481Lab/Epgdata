@@ -27,11 +27,10 @@ jobs:
         run: |
           cat > merge_epg.py << 'PYTHON_EOF'
           import os
-          import sys
           import re
           import glob
           import gzip
-          from datetime import datetime, timedelta
+          from datetime import datetime, timedelta, timezone
 
           def parse_epg_content(content):
               channels = {}
@@ -69,10 +68,8 @@ jobs:
               formatted_lines = []
               for i, line in enumerate(lines):
                   if i == 0 or i == len(lines) - 1:
-                      # Outer tags (e.g. <channel...> and </channel>) get 2 spaces
                       formatted_lines.append("  " + line)
                   else:
-                      # Inner tags (e.g. <title...>, <desc...>) get 4 spaces
                       formatted_lines.append("    " + line)
                       
               return '\n'.join(formatted_lines)
@@ -111,83 +108,94 @@ jobs:
 
           def main():
               print("=" * 70)
-              print("EPG SMART MERGER - CATCHUP & LIVE")
+              print("EPG SMART MERGER - CATCHUP & LIVE (IST TIMEZONE)")
               print("=" * 70)
               
-              today = datetime.now().date()
-              today_str = today.strftime('%Y-%m-%d')
-              tomorrow_str = (today + timedelta(days=1)).strftime('%Y-%m-%d')
+              # Set Indian Standard Time (IST) timezone
+              ist_tz = timezone(timedelta(hours=5, minutes=30))
+              today = datetime.now(ist_tz).date()
+              
+              # Determine target dates
+              tomorrow = today + timedelta(days=1)
+              live_dates = {today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')}
+              
+              # Past 7 days (today-1 down to today-7)
+              catchup_dates = {(today - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(1, 8)}
+              
+              # 10 Days Cutoff for Cleanup
+              cutoff_date = today - timedelta(days=10)
               
               full_channels = {}
               full_programmes_dict = {} 
-              
               live_channels = {}
               live_programmes_dict = {} 
               
-              # 1. Process Catchup files (Day0Catchup to Day6Catchup)
-              catchup_files_found = 0
-              catchup_progs_added = 0
+              # Search for XMLs in Epg directory and Root directory
+              all_xml_files = glob.glob("Epg/*.xml") + glob.glob("*.xml")
               
-              for i in range(7):
-                  filename = f"Day{i}Catchup.xml"
-                  path_in_epg = os.path.join("Epg", filename)
-                  path_in_root = filename
-                  
-                  file_path = path_in_epg if os.path.exists(path_in_epg) else (path_in_root if os.path.exists(path_in_root) else None)
+              for file_path in set(all_xml_files):  # Use set to avoid duplicates
+                  filename = os.path.basename(file_path)
+                  if filename in ['Epg.xml', 'LiveEpg.xml']:
+                      continue
                       
-                  if file_path:
-                      catchup_files_found += 1
+                  # Extract date from filename (assumes YYYY-MM-DD pattern)
+                  match = re.search(r'(\d{4}-\d{2}-\d{2})', filename)
+                  if not match:
+                      continue
+                      
+                  file_date_str = match.group(1)
+                  try:
+                      file_date = datetime.strptime(file_date_str, '%Y-%m-%d').date()
+                  except ValueError:
+                      continue
+                      
+                  # 1. Cleanup old files
+                  if file_date < cutoff_date:
+                      try:
+                          os.remove(file_path)
+                          print(f"🗑️ Deleted old file (>10 days): {file_path}")
+                      except Exception as e:
+                          print(f"  ✗ Error deleting {file_path}: {e}")
+                      continue
+                      
+                  # 2. Process active files
+                  is_live = file_date_str in live_dates
+                  is_catchup = file_date_str in catchup_dates
+                  
+                  if is_live or is_catchup:
                       try:
                           with open(file_path, 'r', encoding='utf-8') as f:
                               content = f.read()
                           
                           channels, programmes = parse_epg_content(content)
+                          tag = "🔴 LIVE" if is_live else "⏪ CATCHUP"
+                          print(f"  📅 {file_date_str} [{tag}]: {filename} ({len(programmes)} programmes)")
+                          
                           for ch_id, ch_xml in channels.items():
                               full_channels[ch_id] = ch_xml
+                              if is_live:
+                                  live_channels[ch_id] = ch_xml
+                          
+                          for prog in programmes:
+                              prog_key = (prog['channel'], prog['start'])
+                              full_programmes_dict[prog_key] = prog
+                              if is_live:
+                                  live_programmes_dict[prog_key] = prog
                                   
-                          for prog in programmes:
-                              prog_key = (prog['channel'], prog['start'])
-                              full_programmes_dict[prog_key] = prog
-                              catchup_progs_added += 1
-                              
-                          print(f"  ✓ {file_path} -> Added {len(programmes)} programmes")
                       except Exception as e:
-                          print(f"  ✗ Error reading {file_path}: {e}")
-              
-              # 2. Process Today & Tomorrow files
-              for target_date in [today_str, tomorrow_str]:
-                  files = sorted(glob.glob(f"Epg/{target_date}*.xml"))
-                  for file_path in files:
-                      try:
-                          with open(file_path, 'r', encoding='utf-8') as f:
-                              content = f.read()
-                          
-                          channels, programmes = parse_epg_content(content)
-                          print(f"  📅 {target_date}: {os.path.basename(file_path)} ({len(programmes)} programmes)")
-                          
-                          for ch_id, ch_xml in channels.items():
-                              full_channels[ch_id] = ch_xml
-                              live_channels[ch_id] = ch_xml
-                          
-                          for prog in programmes:
-                              prog_key = (prog['channel'], prog['start'])
-                              full_programmes_dict[prog_key] = prog
-                              live_programmes_dict[prog_key] = prog
-                              
-                      except Exception as e:
-                          print(f"    ✗ Error: {e}")
+                          print(f"    ✗ Error reading {file_path}: {e}")
               
               # Build and write final outputs
               full_programmes = list(full_programmes_dict.values())
               live_programmes = list(live_programmes_dict.values())
 
               if full_programmes:
-                  print("\n📦 Building Full EPG...")
+                  print(f"\n📦 Building Full EPG ({len(full_programmes)} total programmes)...")
                   build_xml_content = build_xml(full_channels, full_programmes)
                   write_compressed_file(build_xml_content, 'Epg.xml.gz')
               
               if live_programmes:
-                  print("📦 Building Live EPG...")
+                  print(f"📦 Building Live EPG ({len(live_programmes)} live programmes)...")
                   build_xml_content = build_xml(live_channels, live_programmes)
                   write_compressed_file(build_xml_content, 'LiveEpg.xml.gz')
               
@@ -208,11 +216,12 @@ jobs:
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             
             git add Epg.xml.gz LiveEpg.xml.gz
+            git add -u  # CRITICAL: This stages the old .xml files deleted by the script
             
             if git diff --cached --quiet; then
               echo "ℹ️ No changes to commit"
             else
-              git commit -m "Auto update EPG: $(date +%Y-%m-%d_%H-%M) [skip ci]"
+              git commit -m "Auto update EPG & cleanup: $(date +%Y-%m-%d_%H-%M) [skip ci]"
               git push
               echo "✓ Successfully pushed!"
             fi
