@@ -65,7 +65,7 @@ jobs:
             <div class="spinner"></div>
             <h1>You're Offline</h1>
             <p>Please check your internet connection.</p>
-            <button onclick="window.location.href='https://ayushgaana.vercel.app'">Retry Connection</button>
+            <button onclick="window.location.href='https://ayushmobileappmusicgaaana.vercel.app'">Retry Connection</button>
           </body>
           </html>
           EOF
@@ -99,23 +99,31 @@ jobs:
       - name: Add Native Android Platform
         run: npx cap add android
 
-      - name: Inject Permissions & Vivo Meta-Data
+      - name: Inject Permissions & Root Folder Access Meta-Data
         run: |
           node -e "
           const fs = require('fs');
           const path = 'android/app/src/main/AndroidManifest.xml';
           let xml = fs.readFileSync(path, 'utf8');
           const perms = \`
+              <uses-permission android:name=\"android.permission.INTERNET\" />
               <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
               <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\" />
+              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />
               <uses-permission android:name=\"android.permission.WAKE_LOCK\" />
               <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />
               <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />
+              <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />
+              <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />
+              <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />
+              <uses-permission android:name=\"android.permission.READ_MEDIA_AUDIO\" />
+              <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" />
+              <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" />
           \`;
           if (!xml.includes('android.permission.WAKE_LOCK')) {
               xml = xml.replace('<application', perms + '\n    <application');
-              xml = xml.replace('<application', '<application android:hardwareAccelerated=\"true\" android:largeHeap=\"true\"');
-              xml = xml.replace('<activity', '<activity android:supportsPictureInPicture=\"true\"');
+              xml = xml.replace('<application', '<application android:hardwareAccelerated=\"true\" android:largeHeap=\"true\" android:usesCleartextTraffic=\"true\" android:requestLegacyExternalStorage=\"true\" android:preserveLegacyExternalStorage=\"true\"');
+              xml = xml.replace('<activity', '<activity android:hardwareAccelerated=\"true\" android:supportsPictureInPicture=\"true\"');
               fs.writeFileSync(path, xml);
           }
           "
@@ -142,44 +150,342 @@ jobs:
           }
           "
 
-      - name: Inject Native Premium Engine & DOM Isolation
+      - name: Inject Custom Download Engine (Pause/Resume/Cancel + Root Folder)
         run: |
-          cat <<EOF > android/app/src/main/java/com/music8481/app/MainActivity.java
+          cat <<'EOF' > android/app/src/main/java/com/music8481/app/MainActivity.java
           package com.music8481.app;
 
-          import android.graphics.Color;
+          import android.Manifest;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.PictureInPictureParams;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.content.pm.ActivityInfo;
+          import android.content.pm.PackageManager;
+          import android.content.res.Configuration;
+          import android.media.AudioManager;
+          import android.media.MediaScannerConnection;
+          import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
-          import android.Manifest;
-          import android.content.pm.PackageManager;
+          import android.os.Environment;
+          import android.os.PowerManager;
+          import android.provider.Settings;
+          import android.util.Base64;
+          import android.util.Rational;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.view.WindowManager;
+          import android.webkit.CookieManager;
+          import android.webkit.DownloadListener;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.URLUtil;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.widget.FrameLayout;
+          import android.widget.Toast;
+
           import androidx.core.app.ActivityCompat;
+          import androidx.core.app.NotificationCompat;
           import androidx.core.content.ContextCompat;
           import androidx.core.view.WindowCompat;
           import androidx.core.view.WindowInsetsCompat;
           import androidx.core.view.WindowInsetsControllerCompat;
+
           import com.getcapacitor.BridgeActivity;
-          
-          import android.webkit.WebView;
-          import android.webkit.WebSettings;
-          import android.webkit.WebChromeClient;
-          import android.webkit.JavascriptInterface;
-          import android.view.View;
-          import android.view.ViewGroup;
-          import android.view.WindowInsets;
-          import android.widget.FrameLayout;
-          import android.content.Context;
-          import android.os.PowerManager;
-          import android.media.AudioManager;
-          import android.view.WindowManager;
-          import android.app.PictureInPictureParams;
-          import android.content.pm.ActivityInfo;
-          import android.util.Rational;
-          import android.content.res.Configuration;
+
+          import java.io.File;
+          import java.io.InputStream;
+          import java.io.RandomAccessFile;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.concurrent.ConcurrentHashMap;
+          import java.util.concurrent.atomic.AtomicInteger;
 
           public class MainActivity extends BridgeActivity {
               private PowerManager.WakeLock wakeLock;
               private boolean isVideoFullscreen = false;
-              private boolean isVideoModeActive = false; 
+              private boolean isVideoModeActive = false;
+              private String pendingDownloadFilename = null;
+
+              private static final String CHANNEL_ID = "music8481_download_channel";
+              private static final String ACTION_PAUSE = "com.music8481.app.ACTION_PAUSE";
+              private static final String ACTION_RESUME = "com.music8481.app.ACTION_RESUME";
+              private static final String ACTION_CANCEL = "com.music8481.app.ACTION_CANCEL";
+
+              private NotificationManager notificationManager;
+              private final AtomicInteger notificationIdCounter = new AtomicInteger(2000);
+              private final ConcurrentHashMap<Integer, DownloadTask> activeTasks = new ConcurrentHashMap<>();
+
+              // ========================================================
+              // 🔥 CUSTOM MULTI-THREADED DOWNLOAD & NOTIFICATION ENGINE
+              // ========================================================
+              private class DownloadTask {
+                  int id;
+                  String url;
+                  String fileName;
+                  String mimeType;
+                  String userAgent;
+                  String cookies;
+                  File targetFile;
+                  volatile boolean isPaused = false;
+                  volatile boolean isCancelled = false;
+                  long downloadedBytes = 0;
+                  long totalBytes = -1;
+                  int currentProgress = 0;
+                  boolean isBlob = false;
+                  RandomAccessFile blobRaf = null;
+
+                  DownloadTask(int id, String fileName, String mimeType, boolean isBlob) {
+                      this.id = id;
+                      this.fileName = fileName;
+                      this.mimeType = mimeType;
+                      this.isBlob = isBlob;
+                      this.targetFile = new File(getMusic8481Directory(), fileName);
+                  }
+
+                  void startHttpDownload() {
+                      new Thread(() -> {
+                          HttpURLConnection conn = null;
+                          RandomAccessFile raf = null;
+                          InputStream is = null;
+                          try {
+                              File parent = targetFile.getParentFile();
+                              if (parent != null && !parent.exists()) parent.mkdirs();
+
+                              URL u = new URL(url);
+                              conn = (HttpURLConnection) u.openConnection();
+                              conn.setInstanceFollowRedirects(true);
+                              conn.setConnectTimeout(15000);
+                              conn.setReadTimeout(30000);
+                              if (userAgent != null && !userAgent.isEmpty()) conn.setRequestProperty("User-Agent", userAgent);
+                              if (cookies != null && !cookies.isEmpty()) conn.setRequestProperty("Cookie", cookies);
+
+                              if (downloadedBytes > 0 && targetFile.exists()) {
+                                  conn.setRequestProperty("Range", "bytes=" + downloadedBytes + "-");
+                              }
+
+                              conn.connect();
+                              int responseCode = conn.getResponseCode();
+
+                              if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
+                                  long contentLength = conn.getContentLengthLong();
+                                  if (totalBytes <= 0 && contentLength > 0) {
+                                      totalBytes = downloadedBytes + contentLength;
+                                  }
+                                  raf = new RandomAccessFile(targetFile, "rw");
+                                  raf.seek(downloadedBytes);
+                              } else if (responseCode == HttpURLConnection.HTTP_OK) {
+                                  downloadedBytes = 0;
+                                  totalBytes = conn.getContentLengthLong();
+                                  raf = new RandomAccessFile(targetFile, "rw");
+                                  raf.setLength(0);
+                              } else {
+                                  throw new Exception("Server HTTP " + responseCode);
+                              }
+
+                              is = conn.getInputStream();
+                              byte[] buffer = new byte[16384];
+                              int len;
+                              long lastNotifUpdate = 0;
+
+                              updateNotification(currentProgress, false);
+
+                              while ((len = is.read(buffer)) != -1) {
+                                  if (isCancelled) {
+                                      raf.close();
+                                      is.close();
+                                      if (targetFile.exists()) targetFile.delete();
+                                      notificationManager.cancel(id);
+                                      activeTasks.remove(id);
+                                      return;
+                                  }
+                                  if (isPaused) {
+                                      raf.close();
+                                      is.close();
+                                      updateNotification(currentProgress, true);
+                                      return;
+                                  }
+
+                                  raf.write(buffer, 0, len);
+                                  downloadedBytes += len;
+
+                                  if (totalBytes > 0) {
+                                      currentProgress = (int) ((downloadedBytes * 100L) / totalBytes);
+                                  }
+
+                                  long now = System.currentTimeMillis();
+                                  if (now - lastNotifUpdate >= 350) {
+                                      updateNotification(currentProgress, false);
+                                      lastNotifUpdate = now;
+                                  }
+                              }
+
+                              raf.close();
+                              is.close();
+                              completeDownload();
+                          } catch (Exception e) {
+                              e.printStackTrace();
+                              if (!isCancelled && !isPaused) {
+                                  showFailedNotification(e.getMessage());
+                              }
+                          } finally {
+                              try { if (raf != null) raf.close(); } catch (Exception ignored) {}
+                              try { if (is != null) is.close(); } catch (Exception ignored) {}
+                              if (conn != null) conn.disconnect();
+                          }
+                      }).start();
+                  }
+
+                  void completeDownload() {
+                      activeTasks.remove(id);
+                      MediaScannerConnection.scanFile(MainActivity.this, new String[]{targetFile.getAbsolutePath()}, null, null);
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, CHANNEL_ID)
+                              .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                              .setContentTitle(fileName)
+                              .setContentText("100% • Saved to Music8481/Download")
+                              .setSubText("100%")
+                              .setPriority(NotificationCompat.PRIORITY_HIGH)
+                              .setOngoing(false)
+                              .setAutoCancel(true);
+                      notificationManager.notify(id, builder.build());
+                      runOnUiThread(() -> Toast.makeText(MainActivity.this, "Saved: Music8481/Download/" + fileName, Toast.LENGTH_LONG).show());
+                  }
+
+                  void showFailedNotification(String errorMsg) {
+                      activeTasks.remove(id);
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, CHANNEL_ID)
+                              .setSmallIcon(android.R.drawable.stat_notify_error)
+                              .setContentTitle("Download Failed: " + fileName)
+                              .setContentText(errorMsg != null ? errorMsg : "Connection interrupted")
+                              .setOngoing(false)
+                              .setAutoCancel(true);
+                      notificationManager.notify(id, builder.build());
+                  }
+
+                  void updateNotification(int progress, boolean paused) {
+                      Intent pauseOrResumeIntent = new Intent(paused ? ACTION_RESUME : ACTION_PAUSE);
+                      pauseOrResumeIntent.setPackage(getPackageName());
+                      pauseOrResumeIntent.putExtra("taskId", id);
+                      PendingIntent pauseOrResumePending = PendingIntent.getBroadcast(
+                              MainActivity.this,
+                              id * 10 + 1,
+                              pauseOrResumeIntent,
+                              PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      );
+
+                      Intent cancelIntent = new Intent(ACTION_CANCEL);
+                      cancelIntent.setPackage(getPackageName());
+                      cancelIntent.putExtra("taskId", id);
+                      PendingIntent cancelPending = PendingIntent.getBroadcast(
+                              MainActivity.this,
+                              id * 10 + 2,
+                              cancelIntent,
+                              PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                      );
+
+                      String statusText;
+                      if (paused) {
+                          statusText = "Paused at " + progress + "%";
+                      } else if (totalBytes > 0) {
+                          statusText = "Downloading... " + progress + "% (" + formatSize(downloadedBytes) + " / " + formatSize(totalBytes) + ")";
+                      } else {
+                          statusText = "Downloading... " + formatSize(downloadedBytes);
+                      }
+
+                      NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, CHANNEL_ID)
+                              .setSmallIcon(paused ? android.R.drawable.ic_media_pause : android.R.drawable.stat_sys_download)
+                              .setContentTitle(fileName)
+                              .setContentText(statusText)
+                              .setSubText(totalBytes > 0 ? progress + "%" : "")
+                              .setProgress(100, Math.max(0, Math.min(100, progress)), totalBytes <= 0 && !paused)
+                              .setOngoing(!paused)
+                              .setOnlyAlertOnce(true)
+                              .setPriority(NotificationCompat.PRIORITY_LOW)
+                              .addAction(
+                                      paused ? android.R.drawable.ic_media_play : android.R.drawable.ic_media_pause,
+                                      paused ? "Resume" : "Pause",
+                                      pauseOrResumePending
+                              )
+                              .addAction(
+                                      android.R.drawable.ic_menu_close_clear_cancel,
+                                      "Cancel",
+                                      cancelPending
+                              );
+
+                      notificationManager.notify(id, builder.build());
+                  }
+              }
+
+              private String formatSize(long bytes) {
+                  if (bytes < 1024) return bytes + " B";
+                  int exp = (int) (Math.log(bytes) / Math.log(1024));
+                  char pre = "KMGTPE".charAt(exp - 1);
+                  return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+              }
+
+              private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
+                  @Override
+                  public void onReceive(Context context, Intent intent) {
+                      if (intent == null || intent.getAction() == null) return;
+                      int taskId = intent.getIntExtra("taskId", -1);
+                      DownloadTask task = activeTasks.get(taskId);
+                      if (task == null) return;
+
+                      String action = intent.getAction();
+                      if (ACTION_PAUSE.equals(action)) {
+                          task.isPaused = true;
+                          task.updateNotification(task.currentProgress, true);
+                      } else if (ACTION_RESUME.equals(action)) {
+                          if (task.isPaused) {
+                              task.isPaused = false;
+                              task.updateNotification(task.currentProgress, false);
+                              if (!task.isBlob) {
+                                  task.startHttpDownload();
+                              }
+                          }
+                      } else if (ACTION_CANCEL.equals(action)) {
+                          task.isCancelled = true;
+                          task.isPaused = false;
+                          try { if (task.blobRaf != null) task.blobRaf.close(); } catch (Exception ignored) {}
+                          if (task.targetFile != null && task.targetFile.exists()) {
+                              task.targetFile.delete();
+                          }
+                          notificationManager.cancel(taskId);
+                          activeTasks.remove(taskId);
+                          Toast.makeText(MainActivity.this, "Cancelled: " + task.fileName, Toast.LENGTH_SHORT).show();
+                      }
+                  }
+              };
+
+              private File getMusic8481Directory() {
+                  File rootDir = new File(Environment.getExternalStorageDirectory(), "Music8481/Download");
+                  if (!rootDir.exists()) {
+                      rootDir.mkdirs();
+                  }
+                  return rootDir;
+              }
+
+              private void createNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationChannel channel = new NotificationChannel(
+                              CHANNEL_ID,
+                              "Music8481 Downloads",
+                              NotificationManager.IMPORTANCE_LOW
+                      );
+                      channel.setDescription("Shows live download progress with Pause and Cancel controls");
+                      if (notificationManager != null) {
+                          notificationManager.createNotificationChannel(channel);
+                      }
+                  }
+              }
 
               private void updatePiPParams(boolean enable) {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -192,6 +498,65 @@ jobs:
                   }
               }
 
+              private void requestAllPermissions() {
+                  // 1. Request All Files Access on Android 11+ to allow standalone /storage/emulated/0/Music8481/Download folder
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      if (!Environment.isExternalStorageManager()) {
+                          try {
+                              Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                              intent.setData(Uri.parse("package:" + getPackageName()));
+                              startActivity(intent);
+                          } catch (Exception e) {
+                              Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                              startActivity(intent);
+                          }
+                      }
+                  }
+
+                  // 2. Request Runtime Notification & Media Permissions
+                  List<String> listPermissionsNeeded = new ArrayList<>();
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                          listPermissionsNeeded.add(Manifest.permission.POST_NOTIFICATIONS);
+                      }
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                          listPermissionsNeeded.add(Manifest.permission.READ_MEDIA_AUDIO);
+                      }
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
+                          listPermissionsNeeded.add(Manifest.permission.READ_MEDIA_VIDEO);
+                      }
+                  } else {
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                          listPermissionsNeeded.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                      }
+                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                          listPermissionsNeeded.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                      }
+                  }
+                  if (!listPermissionsNeeded.isEmpty()) {
+                      ActivityCompat.requestPermissions(this, listPermissionsNeeded.toArray(new String[0]), 101);
+                  }
+              }
+
+              private String sanitizeFilename(String name, String mimeType) {
+                  if (name == null || name.trim().isEmpty()) {
+                      name = "Track_" + System.currentTimeMillis();
+                  }
+                  name = name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+                  
+                  String lower = name.toLowerCase();
+                  if (!lower.endsWith(".mp3") && !lower.endsWith(".mp4") && !lower.endsWith(".lrc") && !lower.endsWith(".m4a") && !lower.endsWith(".wav") && !lower.endsWith(".webm")) {
+                      if (mimeType != null) {
+                          if (mimeType.contains("video") || mimeType.contains("mp4")) name += ".mp4";
+                          else if (mimeType.contains("lrc") || mimeType.contains("text") || mimeType.contains("plain")) name += ".lrc";
+                          else name += ".mp3";
+                      } else {
+                          name += ".mp3";
+                      }
+                  }
+                  return name;
+              }
+
               public class WebAppInterface {
                   @JavascriptInterface
                   public void setVideoMode(boolean isVideo) {
@@ -200,13 +565,92 @@ jobs:
                           runOnUiThread(() -> updatePiPParams(isVideoFullscreen || isVideoModeActive));
                       }
                   }
+
+                  @JavascriptInterface
+                  public void setPendingFilename(String name) {
+                      if (name != null && !name.trim().isEmpty()) {
+                          pendingDownloadFilename = name.trim();
+                      }
+                  }
+
+                  // Chunked Blob Streamer with Pause, Resume, Cancel & Live Notification %
+                  @JavascriptInterface
+                  public int initBlobDownload(String fileName, String mimeType, long totalSize) {
+                      int id = notificationIdCounter.incrementAndGet();
+                      String cleanName = sanitizeFilename(fileName, mimeType);
+                      DownloadTask task = new DownloadTask(id, cleanName, mimeType, true);
+                      task.totalBytes = totalSize;
+                      try {
+                          File parent = task.targetFile.getParentFile();
+                          if (parent != null && !parent.exists()) parent.mkdirs();
+                          task.blobRaf = new RandomAccessFile(task.targetFile, "rw");
+                          task.blobRaf.setLength(0);
+                          activeTasks.put(id, task);
+                          task.updateNotification(0, false);
+                          runOnUiThread(() -> Toast.makeText(MainActivity.this, "Downloading: " + cleanName, Toast.LENGTH_SHORT).show());
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                          return -1;
+                      }
+                      return id;
+                  }
+
+                  @JavascriptInterface
+                  public String appendBlobChunk(int id, String base64Chunk) {
+                      DownloadTask task = activeTasks.get(id);
+                      if (task == null || task.isCancelled) return "CANCELLED";
+                      if (task.isPaused) return "PAUSED";
+                      try {
+                          String cleanBase64 = base64Chunk.contains(",") ? base64Chunk.split(",")[1] : base64Chunk;
+                          byte[] bytes = Base64.decode(cleanBase64, Base64.DEFAULT);
+                          task.blobRaf.write(bytes);
+                          task.downloadedBytes += bytes.length;
+                          if (task.totalBytes > 0) {
+                              task.currentProgress = (int) ((task.downloadedBytes * 100L) / task.totalBytes);
+                          }
+                          task.updateNotification(task.currentProgress, false);
+                          return "OK";
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                          task.showFailedNotification(e.getMessage());
+                          return "ERROR";
+                      }
+                  }
+
+                  @JavascriptInterface
+                  public void finishBlobDownload(int id) {
+                      DownloadTask task = activeTasks.get(id);
+                      if (task == null) return;
+                      try {
+                          if (task.blobRaf != null) task.blobRaf.close();
+                          task.completeDownload();
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                      }
+                  }
               }
 
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   
-                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+                  notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                  createNotificationChannel();
+
+                  IntentFilter filter = new IntentFilter();
+                  filter.addAction(ACTION_PAUSE);
+                  filter.addAction(ACTION_RESUME);
+                  filter.addAction(ACTION_CANCEL);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                  } else {
+                      registerReceiver(downloadReceiver, filter);
+                  }
+
+                  getWindow().setFlags(
+                      WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                      WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+                  );
 
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                       WindowManager.LayoutParams layoutParams = getWindow().getAttributes();
@@ -215,19 +659,18 @@ jobs:
                   }
                   
                   WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+                  getWindow().getDecorView().setOnApplyWindowInsetsListener((v, insets) -> insets);
 
-                  getWindow().getDecorView().setOnApplyWindowInsetsListener((v, insets) -> {
-                      return insets;
-                  });
-
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                      if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                          ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
-                      }
-                  }
+                  requestAllPermissions();
+                  getMusic8481Directory();
 
                   AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-                  if (audioManager != null) setVolumeControlStream(AudioManager.STREAM_MUSIC);
+                  if (audioManager != null) {
+                      setVolumeControlStream(AudioManager.STREAM_MUSIC);
+                      try {
+                          audioManager.setMode(AudioManager.MODE_NORMAL);
+                      } catch (Exception ignored) {}
+                  }
 
                   PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
                   wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Music8481::BackgroundAudioLock");
@@ -241,42 +684,165 @@ jobs:
                       final WebView webView = this.bridge.getWebView();
                       WebSettings settings = webView.getSettings();
                       
-                      settings.setMediaPlaybackRequiresUserGesture(false); 
                       webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                      settings.setMediaPlaybackRequiresUserGesture(false);
                       settings.setDomStorageEnabled(true);
+                      settings.setDatabaseEnabled(true);
+                      settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                      settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
+                      settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                      settings.setAllowFileAccess(true);
+                      settings.setAllowContentAccess(true);
+                      settings.setJavaScriptCanOpenWindowsAutomatically(true);
+                      
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                          settings.setOffscreenPreRaster(true);
+                      }
                       
                       webView.setFitsSystemWindows(false);
-                      webView.setPadding(0,0,0,0);
+                      webView.setPadding(0, 0, 0, 0);
                       
                       if (webView.getParent() instanceof ViewGroup) {
                           ((ViewGroup) webView.getParent()).setFitsSystemWindows(false);
                           ((ViewGroup) webView.getParent()).setClipToPadding(false);
                       }
 
+                      webView.removeJavascriptInterface("AndroidApp");
                       webView.addJavascriptInterface(new WebAppInterface(), "AndroidApp");
+
+                      webView.setDownloadListener(new DownloadListener() {
+                          @Override
+                          public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
+                              String fileName = pendingDownloadFilename;
+                              pendingDownloadFilename = null;
+
+                              if (fileName == null || fileName.trim().isEmpty()) {
+                                  fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                              }
+                              final String cleanFileName = sanitizeFilename(fileName, mimeType);
+
+                              if (url.startsWith("blob:") || url.startsWith("data:")) {
+                                  String escapedUrl = url.replace("'", "\\'");
+                                  String escapedName = cleanFileName.replace("'", "\\'");
+                                  String escapedMime = (mimeType != null ? mimeType : "").replace("'", "\\'");
+                                  webView.evaluateJavascript("window.__streamBlobToNative && window.__streamBlobToNative('" + escapedUrl + "', '" + escapedName + "', '" + escapedMime + "');", null);
+                              } else {
+                                  int id = notificationIdCounter.incrementAndGet();
+                                  DownloadTask task = new DownloadTask(id, cleanFileName, mimeType, false);
+                                  task.url = url;
+                                  task.userAgent = userAgent;
+                                  task.cookies = CookieManager.getInstance().getCookie(url);
+                                  task.totalBytes = contentLength > 0 ? contentLength : -1;
+                                  activeTasks.put(id, task);
+                                  Toast.makeText(getApplicationContext(), "Downloading: " + cleanFileName, Toast.LENGTH_SHORT).show();
+                                  task.startHttpDownload();
+                              }
+                          }
+                      });
                       
                       webView.postDelayed(() -> {
-                          webView.evaluateJavascript(
-                              "setInterval(function() {" +
-                              "  var meta = document.querySelector('meta[name=\"viewport\"]');" +
-                              "  var content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
-                              "  if (meta && meta.content !== content) {" +
-                              "      meta.content = content;" +
-                              "  } else if (!meta) {" +
-                              "      var m = document.createElement('meta');" +
-                              "      m.name = 'viewport';" +
-                              "      m.content = content;" +
-                              "      document.head.appendChild(m);" +
+                          String boostScript =
+                              "(function() {" +
+                              "  if (window.__music8481Injected) return;" +
+                              "  window.__music8481Injected = true;" +
+                              "  " +
+                              "  /* 1. Fast Audio Switching & Preload Acceleration */" +
+                              "  var OrigAudio = window.Audio;" +
+                              "  window.Audio = function(src) {" +
+                              "    var a = new OrigAudio(src);" +
+                              "    a.preload = 'auto';" +
+                              "    return a;" +
+                              "  };" +
+                              "  window.Audio.prototype = OrigAudio.prototype;" +
+                              "  " +
+                              "  /* 2. Chunked Blob Streamer supporting Pause, Resume & Cancel */" +
+                              "  window.__streamBlobToNative = function(blobUrl, fileName, fallbackMime) {" +
+                              "    fetch(blobUrl).then(function(r) { return r.blob(); }).then(function(blob) {" +
+                              "      var mime = blob.type || fallbackMime || 'audio/mpeg';" +
+                              "      var taskId = window.AndroidApp.initBlobDownload(fileName, mime, blob.size);" +
+                              "      if (taskId < 0) return;" +
+                              "      var chunkSize = 256 * 1024;" +
+                              "      var offset = 0;" +
+                              "      function pushNextChunk() {" +
+                              "        if (offset >= blob.size) {" +
+                              "          window.AndroidApp.finishBlobDownload(taskId);" +
+                              "          return;" +
+                              "        }" +
+                              "        var slice = blob.slice(offset, offset + chunkSize);" +
+                              "        var reader = new FileReader();" +
+                              "        reader.onloadend = function() {" +
+                              "          var b64 = reader.result;" +
+                              "          function tryWrite() {" +
+                              "            var status = window.AndroidApp.appendBlobChunk(taskId, b64);" +
+                              "            if (status === 'OK') {" +
+                              "              offset += chunkSize;" +
+                              "              setTimeout(pushNextChunk, 15);" +
+                              "            } else if (status === 'PAUSED') {" +
+                              "              setTimeout(tryWrite, 400);" +
+                              "            }" +
+                              "          }" +
+                              "          tryWrite();" +
+                              "        };" +
+                              "        reader.readAsDataURL(slice);" +
+                              "      }" +
+                              "      pushNextChunk();" +
+                              "    });" +
+                              "  };" +
+                              "  " +
+                              "  /* 3. Intercept Anchor Clicks & Programmatic Downloads */" +
+                              "  function handleAnchorDownload(a) {" +
+                              "    if (!a || !a.href) return false;" +
+                              "    var dlAttr = a.getAttribute('download');" +
+                              "    var href = a.href;" +
+                              "    var isBlobOrData = href.indexOf('blob:') === 0 || href.indexOf('data:') === 0;" +
+                              "    var isMediaExt = /\\.(mp3|mp4|lrc|m4a|wav)(\\?|$)/i.test(href);" +
+                              "    if (dlAttr !== null || isBlobOrData || isMediaExt) {" +
+                              "      var name = dlAttr || a.title || (a.innerText ? a.innerText.trim() : '') || document.title || 'Music8481_Track';" +
+                              "      if (window.AndroidApp) window.AndroidApp.setPendingFilename(name);" +
+                              "      if (isBlobOrData && window.AndroidApp) {" +
+                              "        window.__streamBlobToNative(href, name, '');" +
+                              "        return true;" +
+                              "      }" +
+                              "    }" +
+                              "    return false;" +
                               "  }" +
-                              "  document.documentElement.style.padding = '0';" +
-                              "  document.documentElement.style.margin = '0';" +
-                              "  document.body.style.padding = '0';" +
-                              "  document.body.style.margin = '0';" +
-                              "  var iframe = document.querySelector('iframe[src*=\"ayushcom.vercel.app\"]');" +
-                              "  var hasVideo = iframe !== null;" +
-                              "  if (window.AndroidApp) window.AndroidApp.setVideoMode(hasVideo);" +
-                              "}, 500);", null);
-                      }, 2000);
+                              "  " +
+                              "  document.addEventListener('click', function(e) {" +
+                              "    var a = e.target.closest ? e.target.closest('a') : null;" +
+                              "    if (a && handleAnchorDownload(a)) {" +
+                              "      e.preventDefault();" +
+                              "      e.stopPropagation();" +
+                              "    }" +
+                              "  }, true);" +
+                              "  " +
+                              "  var origClick = HTMLAnchorElement.prototype.click;" +
+                              "  HTMLAnchorElement.prototype.click = function() {" +
+                              "    if (handleAnchorDownload(this)) return;" +
+                              "    return origClick.apply(this, arguments);" +
+                              "  };" +
+                              "  " +
+                              "  /* 4. Continuous DOM Optimization & Media Preload Loop */" +
+                              "  setInterval(function() {" +
+                              "    var meta = document.querySelector('meta[name=\"viewport\"]');" +
+                              "    var content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
+                              "    if (meta && meta.content !== content) meta.content = content;" +
+                              "    document.documentElement.style.padding = '0';" +
+                              "    document.documentElement.style.margin = '0';" +
+                              "    document.body.style.padding = '0';" +
+                              "    document.body.style.margin = '0';" +
+                              "    " +
+                              "    var medias = document.querySelectorAll('audio, video');" +
+                              "    for (var i = 0; i < medias.length; i++) {" +
+                              "      if (medias[i].preload !== 'auto') medias[i].preload = 'auto';" +
+                              "      medias[i].style.transform = 'translateZ(0)';" +
+                              "    }" +
+                              "    " +
+                              "    var iframe = document.querySelector('iframe[src*=\"ayushcom.vercel.app\"]');" +
+                              "    if (window.AndroidApp) window.AndroidApp.setVideoMode(iframe !== null);" +
+                              "  }, 500);" +
+                              "})();";
+                          webView.evaluateJavascript(boostScript, null);
+                      }, 1000);
 
                       final WebChromeClient originalClient = webView.getWebChromeClient();
                       webView.setWebChromeClient(new WebChromeClient() {
@@ -325,9 +891,6 @@ jobs:
                   }
               }
 
-              // ==========================================
-              // 🔥 DOM-TREE ISOLATION ENGINE FOR PiP 🔥
-              // ==========================================
               @Override
               public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
                   super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
@@ -400,6 +963,7 @@ jobs:
               @Override
               public void onDestroy() {
                   super.onDestroy();
+                  try { unregisterReceiver(downloadReceiver); } catch (Exception ignored) {}
                   if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
               }
           }
