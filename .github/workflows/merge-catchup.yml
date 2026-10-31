@@ -30,7 +30,7 @@ jobs:
           npm install @capgo/capacitor-media-session
           npm install @capacitor/splash-screen
 
-      - name: Initialize Capacitor Config & Premium Colorful Offline UI
+      - name: Initialize Capacitor Config & Offline UI
         run: |
           mkdir -p www
           cat <<'EOF' > www/index.html
@@ -52,305 +52,21 @@ jobs:
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-            <title>Music8481 Offline Vault</title>
+            <title>Music8481 Offline</title>
             <style>
-              * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-              body { background: #07070b; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0 0 175px 0; user-select: none; overflow-x: hidden; }
-              .glow-1 { position: fixed; top: -80px; left: -80px; width: 260px; height: 260px; background: rgba(16,185,129,0.22); filter: blur(100px); pointer-events: none; z-index: 0; }
-              .glow-2 { position: fixed; top: 180px; right: -90px; width: 260px; height: 260px; background: rgba(217,70,239,0.16); filter: blur(110px); pointer-events: none; z-index: 0; }
-              header { position: sticky; top: 0; z-index: 20; background: rgba(7,7,11,0.82); backdrop-filter: blur(16px); padding: 22px 16px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-              .top-row { display: flex; align-items: center; justify-content: space-between; }
-              .brand { font-size: 20px; font-weight: 800; background: linear-gradient(90deg, #fff, #6ee7b7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-              .badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 10px; padding: 3px 8px; border-radius: 99px; font-weight: 800; margin-left: 8px; }
-              .btn-online { background: linear-gradient(135deg, #1DB954, #34d399); color: #000; border: none; padding: 8px 14px; border-radius: 14px; font-size: 12px; font-weight: 800; cursor: pointer; }
-              .sub { color: #9ca3af; font-size: 11px; margin-top: 4px; }
-              .hero { margin: 16px 16px 6px; padding: 16px; border-radius: 24px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(139,92,246,0.25)); z-index: 5; }
-              .hero img, .art-box img { width: 100%; height: 100%; object-fit: cover; }
-              .art-box { width: 54px; height: 54px; border-radius: 16px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, #10b981, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
-              .list { padding: 10px 16px; display: flex; flex-direction: column; gap: 10px; position: relative; z-index: 5; }
-              .card { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 10px 12px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
-              .card.active { border-color: rgba(52,211,153,0.6); background: linear-gradient(90deg, rgba(16,185,129,0.22), rgba(217,70,239,0.1)); }
-              .title { font-size: 14px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 205px; }
-              .artist { font-size: 12px; font-weight: 600; color: #6ee7b7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 205px; margin-top: 2px; }
-              .meta { font-size: 10px; color: #9ca3af; margin-top: 3px; display: flex; gap: 6px; align-items: center; }
-              .lrc-tag { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); padding: 1px 6px; border-radius: 5px; font-size: 9px; font-weight: 800; }
-              
-              /* Mini Player 30px Up From Bottom */
-              .mini-player { position: fixed; bottom: 30px; left: 12px; right: 12px; background: rgba(12,12,18,0.94); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.16); border-radius: 24px; z-index: 30; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.85); }
-              .mini-prog { width: 100%; height: 3px; background: rgba(255,255,255,0.1); }
-              .mini-prog-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #1DB954, #22d3ee); }
-              .mini-lyric { background: rgba(16,185,129,0.14); color: #6ee7b7; font-size: 11px; font-weight: 700; text-align: center; padding: 4px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-              .mini-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
-              .ctrl-btn { background: rgba(255,255,255,0.08); color: #fff; border: none; width: 38px; height: 38px; border-radius: 14px; font-size: 14px; font-weight: 800; cursor: pointer; }
-              .play-btn { background: linear-gradient(135deg, #1DB954, #34d399); color: #000; border: none; width: 44px; height: 44px; border-radius: 16px; font-size: 16px; font-weight: 900; cursor: pointer; }
-
-              /* Full Screen Modal */
-              .full-modal { position: fixed; inset: 0; background: #050508; z-index: 50; display: none; flex-direction: column; justify-content: space-between; padding: 24px 22px 42px 22px; overflow: hidden; }
-              .full-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(45px) brightness(0.45); transform: scale(1.25); z-index: 0; pointer-events: none; }
-              .full-top, .full-center, .full-bottom { position: relative; z-index: 2; }
-              .full-top { display: flex; align-items: center; justify-content: space-between; }
-              .full-art { width: 270px; height: 270px; border-radius: 32px; overflow: hidden; margin: 0 auto; box-shadow: 0 24px 60px rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.18); background: linear-gradient(135deg, #10b981, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 54px; }
-              .lyrics-box { height: 300px; overflow-y: auto; text-align: center; padding: 20px 8px; display: none; }
-              .lyric-line { color: rgba(255,255,255,0.45); font-size: 15px; font-weight: 600; margin: 14px 0; transition: 0.25s; }
-              .lyric-line.active { color: #6ee7b7; font-size: 21px; font-weight: 900; transform: scale(1.04); }
-              input[type=range] { width: 100%; accent-color: #1DB954; height: 5px; }
+              body { background: #07070b; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 24px; }
+              .spinner { width: 50px; height: 50px; border: 3px solid rgba(29, 185, 84, 0.3); border-top-color: #1DB954; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+              @keyframes spin { 100% { transform: rotate(360deg); } }
+              h1 { font-size: 22px; margin: 0 0 8px; }
+              p { color: #9ca3af; font-size: 14px; margin-bottom: 24px; max-width: 80%; }
+              button { background: linear-gradient(135deg, #1DB954, #34d399); color: #000; border: none; padding: 12px 28px; border-radius: 99px; font-weight: bold; cursor: pointer; font-size: 14px; box-shadow: 0 4px 20px rgba(29,185,84,0.4); }
             </style>
           </head>
           <body>
-            <div class="glow-1"></div>
-            <div class="glow-2"></div>
-
-            <header>
-              <div class="top-row">
-                <div style="display:flex;align-items:center;">
-                  <span class="brand">Music8481 Vault</span>
-                  <span class="badge">OFFLINE</span>
-                </div>
-                <button class="btn-online" onclick="window.location.href='https://ayushmobileappmusicgaaana.vercel.app/download'">Online Mode</button>
-              </div>
-              <div class="sub">ID3 Banner & Artist • /Music8481/Download</div>
-            </header>
-
-            <div id="heroBox"></div>
-            <video id="videoBox" controls playsinline style="width:92%;margin:10px auto;display:none;border-radius:20px;background:#000;"></video>
-            <audio id="audioBox" preload="auto"></audio>
-
-            <div class="list" id="trackList"></div>
-
-            <!-- Floating Mini Player (30px Up) -->
-            <div class="mini-player" id="miniPlayer" style="display:none;" onclick="openFull(true)">
-              <div class="mini-prog"><div class="mini-prog-bar" id="miniBar"></div></div>
-              <div class="mini-lyric" id="miniLyric" style="display:none;">♪ ...</div>
-              <div class="mini-row">
-                <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-                  <div class="art-box" id="miniArt" style="width:46px;height:46px;border-radius:14px;">♪</div>
-                  <div style="min-width:0;flex:1;">
-                    <div class="title" id="miniTitle">Not Playing</div>
-                    <div class="artist" id="miniArtist">Unknown Artist</div>
-                  </div>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center;" onclick="event.stopPropagation();">
-                  <button class="ctrl-btn" onclick="prevTrack()">⏮</button>
-                  <button class="play-btn" id="miniPlayBtn" onclick="togglePlay()">▶</button>
-                  <button class="ctrl-btn" onclick="nextTrack()">⏭</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Full-Screen Player Modal -->
-            <div class="full-modal" id="fullModal">
-              <img id="fullBg" class="full-bg" style="display:none;" />
-              <div class="full-top">
-                <button class="ctrl-btn" onclick="openFull(false)">▼</button>
-                <div style="display:flex;gap:6px;">
-                  <button class="btn-online" id="tabArtBtn" onclick="switchTab('art')">Banner</button>
-                  <button class="ctrl-btn" id="tabLrcBtn" style="width:auto;padding:0 12px;" onclick="switchTab('lrc')">Lyrics</button>
-                </div>
-                <div style="width:38px;"></div>
-              </div>
-
-              <div class="full-center">
-                <div class="full-art" id="fullArtBox">♪</div>
-                <div class="lyrics-box" id="fullLyricsBox"></div>
-              </div>
-
-              <div class="full-bottom">
-                <div style="margin-bottom:14px;">
-                  <div style="font-size:22px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="fullTitle">Track</div>
-                  <div style="font-size:14px;font-weight:700;color:#6ee7b7;margin-top:3px;" id="fullArtist">Artist</div>
-                </div>
-                <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:#9ca3af;margin-top:4px;">
-                  <span id="curTime">0:00</span>
-                  <span id="durTime">0:00</span>
-                </div>
-                <div style="display:flex;align-items:center;justify-content:space-evenly;margin-top:16px;">
-                  <button class="ctrl-btn" style="width:50px;height:50px;font-size:18px;" onclick="prevTrack()">⏮</button>
-                  <button class="play-btn" id="fullPlayBtn" style="width:66px;height:66px;border-radius:24px;font-size:24px;" onclick="togglePlay()">▶</button>
-                  <button class="ctrl-btn" style="width:50px;height:50px;font-size:18px;" onclick="nextTrack()">⏭</button>
-                </div>
-              </div>
-            </div>
-
-            <script>
-              let tracks = [];
-              let currentIdx = -1;
-              let currentLyrics = [];
-              const audioEl = document.getElementById('audioBox');
-              const videoEl = document.getElementById('videoBox');
-              const seekBar = document.getElementById('seekBar');
-
-              function fmtTime(s) {
-                if (!s || isNaN(s)) return '0:00';
-                const m = Math.floor(s / 60), sec = Math.floor(s % 60);
-                return m + ':' + (sec < 10 ? '0' : '') + sec;
-              }
-
-              function parseLrc(text) {
-                if (!text) return [];
-                const lines = text.split(/\r?\n/);
-                const out = [];
-                const reg = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g;
-                lines.forEach(line => {
-                  const matches = [...line.matchAll(reg)];
-                  const clean = line.replace(reg, '').trim();
-                  matches.forEach(m => {
-                    const t = parseInt(m[1])*60 + parseInt(m[2]) + (parseInt((m[3]||'0').padEnd(3,'0'))/1000);
-                    if (clean) out.push({ time: t, text: clean });
-                  });
-                });
-                return out.sort((a,b) => a.time - b.time);
-              }
-
-              function artHtml(t) {
-                if (t.hasArt && t.artUrl) {
-                  return `<img src="${t.artUrl}" onerror="this.style.display='none'" />`;
-                }
-                return t.isVideo ? '🎬' : '♪';
-              }
-
-              function loadOfflineTracks() {
-                if (!window.AndroidApp || !window.AndroidApp.getDownloadedFiles) return;
-                tracks = JSON.parse(window.AndroidApp.getDownloadedFiles() || "[]");
-                const container = document.getElementById('trackList');
-                if (!tracks.length) {
-                  container.innerHTML = '<p style="text-align:center;color:#888;margin-top:50px;">No tracks in /Music8481/Download yet.</p>';
-                  return;
-                }
-                const feat = currentIdx >= 0 ? tracks[currentIdx] : tracks[0];
-                document.getElementById('heroBox').innerHTML = `
-                  <div class="hero" onclick="playIndex(${currentIdx >= 0 ? currentIdx : 0});openFull(true);">
-                    <div class="art-box" style="width:72px;height:72px;border-radius:20px;">${artHtml(feat)}</div>
-                    <div style="min-width:0;flex:1;">
-                      <div style="font-size:10px;font-weight:800;color:#6ee7b7;text-transform:uppercase;">ID3 Featured Banner</div>
-                      <div class="title" style="font-size:17px;max-width:100%;margin-top:2px;">${feat.title || feat.baseName}</div>
-                      <div class="artist">${feat.artist || 'Unknown Artist'}</div>
-                    </div>
-                  </div>
-                `;
-                container.innerHTML = tracks.map((t, i) => `
-                  <div class="card ${i === currentIdx ? 'active' : ''}" onclick="playIndex(${i})">
-                    <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-                      <div class="art-box">${artHtml(t)}</div>
-                      <div style="min-width:0;flex:1;">
-                        <div class="title">${t.title || t.baseName}</div>
-                        <div class="artist">${t.artist || 'Unknown Artist'}</div>
-                        <div class="meta">
-                          <span>${(t.size / (1024*1024)).toFixed(1)} MB</span> • <span>${t.ext.toUpperCase()}</span>
-                          ${t.hasLyrics ? '<span class="lrc-tag">LRC</span>' : ''}
-                        </div>
-                      </div>
-                    </div>
-                    <span style="color:#6ee7b7;font-weight:900;padding-left:8px;">▶</span>
-                  </div>
-                `).join('');
-              }
-
-              function playIndex(i) {
-                if (i < 0 || i >= tracks.length) return;
-                currentIdx = i;
-                const t = tracks[i];
-                currentLyrics = t.hasLyrics ? parseLrc(t.lrcContent) : [];
-
-                document.getElementById('miniPlayer').style.display = 'block';
-                document.getElementById('miniTitle').innerText = t.title || t.baseName;
-                document.getElementById('miniArtist').innerText = t.artist || 'Unknown Artist';
-                document.getElementById('miniArt').innerHTML = artHtml(t);
-
-                document.getElementById('fullTitle').innerText = t.title || t.baseName;
-                document.getElementById('fullArtist').innerText = (t.artist || 'Unknown Artist') + (t.album ? ' • ' + t.album : '');
-                document.getElementById('fullArtBox').innerHTML = artHtml(t);
-
-                const bg = document.getElementById('fullBg');
-                if (t.hasArt && t.artUrl) { bg.src = t.artUrl; bg.style.display = 'block'; }
-                else { bg.style.display = 'none'; }
-
-                const lrcBox = document.getElementById('fullLyricsBox');
-                if (currentLyrics.length) {
-                  lrcBox.innerHTML = currentLyrics.map((l, idx) => `<div class="lyric-line" id="lrc-${idx}">${l.text}</div>`).join('');
-                  document.getElementById('miniLyric').style.display = 'block';
-                } else {
-                  lrcBox.innerHTML = '<div style="margin-top:90px;color:#888;">No .LRC lyrics found for this song</div>';
-                  document.getElementById('miniLyric').style.display = 'none';
-                }
-
-                if (t.isVideo) {
-                  audioEl.pause();
-                  videoEl.style.display = 'block';
-                  videoEl.src = t.url;
-                  videoEl.play();
-                } else {
-                  videoEl.pause();
-                  videoEl.style.display = 'none';
-                  audioEl.src = t.url;
-                  audioEl.play();
-                }
-                document.getElementById('miniPlayBtn').innerText = '❚❚';
-                document.getElementById('fullPlayBtn').innerText = '❚❚';
-                loadOfflineTracks();
-              }
-
-              function openFull(show) {
-                document.getElementById('fullModal').style.display = show ? 'flex' : 'none';
-              }
-
-              function switchTab(tab) {
-                const isArt = tab === 'art';
-                document.getElementById('fullArtBox').style.display = isArt ? 'flex' : 'none';
-                document.getElementById('fullLyricsBox').style.display = isArt ? 'none' : 'block';
-              }
-
-              function activeMedia() {
-                return (currentIdx >= 0 && tracks[currentIdx].isVideo) ? videoEl : audioEl;
-              }
-
-              function togglePlay() {
-                const m = activeMedia();
-                if (m.paused) {
-                  m.play();
-                  document.getElementById('miniPlayBtn').innerText = '❚❚';
-                  document.getElementById('fullPlayBtn').innerText = '❚❚';
-                } else {
-                  m.pause();
-                  document.getElementById('miniPlayBtn').innerText = '▶';
-                  document.getElementById('fullPlayBtn').innerText = '▶';
-                }
-              }
-
-              function nextTrack() { if (tracks.length) playIndex((currentIdx + 1) % tracks.length); }
-              function prevTrack() { if (tracks.length) playIndex((currentIdx - 1 + tracks.length) % tracks.length); }
-
-              [audioEl, videoEl].forEach(el => {
-                el.addEventListener('timeupdate', () => {
-                  if (el.duration) {
-                    seekBar.max = el.duration;
-                    seekBar.value = el.currentTime;
-                    document.getElementById('curTime').innerText = fmtTime(el.currentTime);
-                    document.getElementById('durTime').innerText = fmtTime(el.duration);
-                    document.getElementById('miniBar').style.width = ((el.currentTime / el.duration) * 100) + '%';
-                  }
-                  if (currentLyrics.length) {
-                    let activeIdx = -1;
-                    for (let i = 0; i < currentLyrics.length; i++) {
-                      if (el.currentTime >= currentLyrics[i].time) activeIdx = i;
-                      else break;
-                    }
-                    if (activeIdx >= 0) {
-                      document.getElementById('miniLyric').innerText = '♪ ' + currentLyrics[activeIdx].text;
-                      document.querySelectorAll('.lyric-line').forEach((node, idx) => {
-                        node.classList.toggle('active', idx === activeIdx);
-                        if (idx === activeIdx) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      });
-                    }
-                  }
-                });
-                el.addEventListener('ended', nextTrack);
-              });
-
-              seekBar.addEventListener('input', (e) => { activeMedia().currentTime = parseFloat(e.target.value); });
-              window.addEventListener('online', () => { window.location.href = 'https://ayushmobileappmusicgaaana.vercel.app/download'; });
-              setTimeout(loadOfflineTracks, 300);
-            </script>
+            <div class="spinner"></div>
+            <h1>You're Offline</h1>
+            <p>No internet connection detected. You can access your downloaded music library anytime.</p>
+            <button onclick="window.location.href='/download'">Go to Downloads</button>
           </body>
           </html>
           EOF
@@ -372,7 +88,7 @@ jobs:
               "SplashScreen": {
                 "launchShowDuration": 2500,
                 "launchAutoHide": true,
-                "backgroundColor": "#000000",
+                "backgroundColor": "#07070b",
                 "androidSplashResourceName": "splash",
                 "showSpinner": true,
                 "spinnerColor": "#1DB954"
@@ -519,7 +235,6 @@ jobs:
               private boolean isVideoFullscreen = false;
               private boolean isVideoModeActive = false;
               private String pendingDownloadFilename = null;
-              private boolean initialRouteHandled = false;
 
               private static final String CHANNEL_ID = "music8481_download_channel";
               private static final String ACTION_PAUSE = "com.music8481.app.ACTION_PAUSE";
@@ -947,9 +662,6 @@ jobs:
                       }
                   }
 
-                  // =========================================================================
-                  // 🔥 SCAN /Music8481/Download + EXTRACT ID3 TITLE, ARTIST, ALBUM & ART
-                  // =========================================================================
                   @JavascriptInterface
                   public String getDownloadedFiles() {
                       JSONArray result = new JSONArray();
@@ -994,7 +706,6 @@ jobs:
                                   String encoded = URLEncoder.encode(name, "UTF-8").replace("+", "%20");
                                   obj.put("url", "https://localmedia.music8481.app/" + encoded);
 
-                                  // Extract ID3v2 Tags & Check Embedded Picture
                                   String id3Title = null;
                                   String id3Artist = null;
                                   String id3Album = null;
@@ -1196,9 +907,6 @@ jobs:
                       webView.removeJavascriptInterface("AndroidApp");
                       webView.addJavascriptInterface(new WebAppInterface(), "AndroidApp");
 
-                      // =========================================================================
-                      // 🔥 LOCAL MEDIA & ID3 EMBEDDED ART SERVER (https://localmedia.music8481.app)
-                      // =========================================================================
                       webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
                           @Override
                           public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -1208,7 +916,6 @@ jobs:
                                       String rawPath = uri.getPath();
                                       if (rawPath != null && rawPath.startsWith("/")) rawPath = rawPath.substring(1);
 
-                                      // Serve Embedded ID3 Cover Art Banner
                                       if (rawPath != null && rawPath.startsWith("__art__/")) {
                                           String artFileName = URLDecoder.decode(rawPath.substring(8), "UTF-8");
                                           File mediaFile = findLocalMediaFile(artFileName);
@@ -1294,17 +1001,8 @@ jobs:
                           }
                       });
 
-                      if (!initialRouteHandled) {
-                          initialRouteHandled = true;
-                          SharedPreferences prefs = getSharedPreferences("Music8481Prefs", MODE_PRIVATE);
-                          boolean isFirstOpen = prefs.getBoolean("is_first_open", true);
-
-                          if (!isNetworkOnline()) {
-                              webView.loadUrl("file:///android_asset/public/error.html");
-                          } else if (isFirstOpen) {
-                              prefs.edit().putBoolean("is_first_open", false).apply();
-                              webView.loadUrl("https://ayushmobileappmusicgaaana.vercel.app/download");
-                          }
+                      if (!isNetworkOnline()) {
+                          webView.loadUrl("file:///android_asset/public/error.html");
                       }
 
                       webView.setDownloadListener(new DownloadListener() {
@@ -1584,7 +1282,7 @@ jobs:
           mkdir -p assets
           
           wget -q https://raw.githubusercontent.com/Ayush8481Lab/Ayushgaana/refs/heads/main/app/android-chrome-512x512.png -O assets/icon.png
-          convert -size 2732x2732 xc:"#000000" assets/icon.png -gravity center -composite assets/splash.png
+          convert -size 2732x2732 xc:"#07070b" assets/icon.png -gravity center -composite assets/splash.png
           npx @capacitor/assets generate --android
 
       - name: Fix Gradle Daemon & Memory Issues (CI Stability)
