@@ -30,42 +30,190 @@ jobs:
           npm install @capgo/capacitor-media-session
           npm install @capacitor/splash-screen
 
-      - name: Initialize Capacitor Config & Offline UI
+      - name: Initialize Capacitor Config & Built-in Offline Download Manager UI
         run: |
           mkdir -p www
-          cat <<EOF > www/index.html
+          cat <<'EOF' > www/index.html
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-            <title>Loading...</title>
+            <title>Music8481</title>
             <style>body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; }</style>
           </head>
           <body></body>
           </html>
           EOF
           
-          cat <<EOF > www/error.html
+          cat <<'EOF' > www/error.html
           <!DOCTYPE html>
           <html lang="en">
           <head>
-            <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-            <title>Offline</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+            <title>Offline Downloads - Music8481</title>
             <style>
-              body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-              .spinner { width: 50px; height: 50px; border: 3px solid rgba(29, 185, 84, 0.3); border-top-color: #1DB954; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-              @keyframes spin { 100% { transform: rotate(360deg); } }
-              h1 { font-size: 24px; margin: 0 0 10px; }
-              p { color: #a7a7a7; font-size: 14px; text-align: center; max-width: 80%; }
-              button { margin-top: 20px; background: #1DB954; color: #000; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+              * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+              body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0 0 165px 0; user-select: none; }
+              header { position: sticky; top: 0; z-index: 20; background: rgba(0,0,0,0.92); backdrop-filter: blur(12px); padding: 18px 16px 12px; border-bottom: 1px solid #222; }
+              .top-row { display: flex; align-items: center; justify-content: space-between; }
+              .badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 700; margin-left: 8px; }
+              .btn { background: #1DB954; color: #000; border: none; padding: 8px 14px; border-radius: 99px; font-size: 12px; font-weight: 700; cursor: pointer; }
+              .sub { color: #888; font-size: 12px; margin-top: 4px; }
+              .list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+              .card { display: flex; align-items: center; justify-content: space-between; background: #121212; border: 1px solid #242424; padding: 12px; border-radius: 16px; cursor: pointer; }
+              .card.active { border-color: #1DB954; background: rgba(29, 185, 84, 0.14); }
+              .title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+              .meta { font-size: 11px; color: #999; margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+              .lrc-tag { background: rgba(29,185,84,0.2); color: #1DB954; border: 1px solid rgba(29,185,84,0.4); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+              .player { position: fixed; bottom: 0; left: 0; right: 0; background: #0a0a0a; border-top: 1px solid #262626; padding: 12px 16px 18px; z-index: 30; }
+              .lyric-banner { background: rgba(29,185,84,0.12); border: 1px solid rgba(29,185,84,0.3); color: #1DB954; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; text-align: center; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .controls { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+              input[type=range] { width: 100%; accent-color: #1DB954; }
+              #videoBox { width: 100%; max-height: 240px; background: #000; display: none; border-bottom: 1px solid #222; }
             </style>
           </head>
           <body>
-            <div class="spinner"></div>
-            <h1>You're Offline</h1>
-            <p>Please check your internet connection.</p>
-            <button onclick="window.location.href='https://ayushmobileappmusicgaaana.vercel.app'">Retry Connection</button>
+            <header>
+              <div class="top-row">
+                <div style="display:flex;align-items:center;">
+                  <h1 style="font-size:18px;margin:0;">My Downloads</h1>
+                  <span class="badge">OFFLINE MODE</span>
+                </div>
+                <button class="btn" onclick="window.location.href='https://ayushmobileappmusicgaaana.vercel.app/download'">Go Online</button>
+              </div>
+              <div class="sub">Folder: /Music8481/Download • Plays Offline with .LRC</div>
+            </header>
+
+            <video id="videoBox" controls playsinline></video>
+            <audio id="audioBox" preload="auto"></audio>
+
+            <div class="list" id="trackList"></div>
+
+            <div class="player" id="playerBar" style="display:none;">
+              <div class="lyric-banner" id="lyricBanner" style="display:none;">♪ ...</div>
+              <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
+              <div class="controls">
+                <div style="min-width:0;flex:1;padding-right:10px;">
+                  <div class="title" id="nowTitle">Not Playing</div>
+                  <div class="meta" id="nowSub">Offline Ready</div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <button class="btn" onclick="prevTrack()" style="background:#222;color:#fff;">⏮</button>
+                  <button class="btn" id="playBtn" onclick="togglePlay()">▶</button>
+                  <button class="btn" onclick="nextTrack()" style="background:#222;color:#fff;">⏭</button>
+                </div>
+              </div>
+            </div>
+
+            <script>
+              let tracks = [];
+              let currentIdx = -1;
+              let currentLyrics = [];
+              const audioEl = document.getElementById('audioBox');
+              const videoEl = document.getElementById('videoBox');
+              const seekBar = document.getElementById('seekBar');
+              const lyricBanner = document.getElementById('lyricBanner');
+
+              function parseLrc(text) {
+                if (!text) return [];
+                const lines = text.split(/\r?\n/);
+                const out = [];
+                const reg = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g;
+                lines.forEach(line => {
+                  const matches = [...line.matchAll(reg)];
+                  const clean = line.replace(reg, '').trim();
+                  matches.forEach(m => {
+                    const t = parseInt(m[1])*60 + parseInt(m[2]) + (parseInt((m[3]||'0').padEnd(3,'0'))/1000);
+                    if (clean) out.push({ time: t, text: clean });
+                  });
+                });
+                return out.sort((a,b) => a.time - b.time);
+              }
+
+              function loadOfflineTracks() {
+                if (!window.AndroidApp || !window.AndroidApp.getDownloadedFiles) return;
+                tracks = JSON.parse(window.AndroidApp.getDownloadedFiles() || "[]");
+                const container = document.getElementById('trackList');
+                if (!tracks.length) {
+                  container.innerHTML = '<p style="text-align:center;color:#666;margin-top:60px;">No files in /Music8481/Download yet.</p>';
+                  return;
+                }
+                container.innerHTML = tracks.map((t, i) => `
+                  <div class="card ${i === currentIdx ? 'active' : ''}" onclick="playIndex(${i})">
+                    <div>
+                      <div class="title">${t.baseName}</div>
+                      <div class="meta">
+                        <span>${(t.size / (1024*1024)).toFixed(1)} MB</span> • <span>${t.ext.toUpperCase()}</span>
+                        ${t.hasLyrics ? '<span class="lrc-tag">LRC LYRICS</span>' : ''}
+                      </div>
+                    </div>
+                    <span style="color:#1DB954;font-weight:700;">▶</span>
+                  </div>
+                `).join('');
+              }
+
+              function playIndex(i) {
+                if (i < 0 || i >= tracks.length) return;
+                currentIdx = i;
+                const t = tracks[i];
+                currentLyrics = t.hasLyrics ? parseLrc(t.lrcContent) : [];
+                document.getElementById('playerBar').style.display = 'block';
+                document.getElementById('nowTitle').innerText = t.baseName;
+                document.getElementById('nowSub').innerText = t.hasLyrics ? 'Synced .LRC Active' : 'Local Storage';
+                lyricBanner.style.display = currentLyrics.length ? 'block' : 'none';
+
+                if (t.isVideo) {
+                  audioEl.pause();
+                  videoEl.style.display = 'block';
+                  videoEl.src = t.url;
+                  videoEl.play();
+                } else {
+                  videoEl.pause();
+                  videoEl.style.display = 'none';
+                  audioEl.src = t.url;
+                  audioEl.play();
+                }
+                document.getElementById('playBtn').innerText = '❚❚';
+                loadOfflineTracks();
+              }
+
+              function activeMedia() {
+                return (currentIdx >= 0 && tracks[currentIdx].isVideo) ? videoEl : audioEl;
+              }
+
+              function togglePlay() {
+                const m = activeMedia();
+                if (m.paused) { m.play(); document.getElementById('playBtn').innerText = '❚❚'; }
+                else { m.pause(); document.getElementById('playBtn').innerText = '▶'; }
+              }
+
+              function nextTrack() { if (tracks.length) playIndex((currentIdx + 1) % tracks.length); }
+              function prevTrack() { if (tracks.length) playIndex((currentIdx - 1 + tracks.length) % tracks.length); }
+
+              [audioEl, videoEl].forEach(el => {
+                el.addEventListener('timeupdate', () => {
+                  if (el.duration) {
+                    seekBar.max = el.duration;
+                    seekBar.value = el.currentTime;
+                  }
+                  if (currentLyrics.length) {
+                    let active = '';
+                    for (let i = 0; i < currentLyrics.length; i++) {
+                      if (el.currentTime >= currentLyrics[i].time) active = currentLyrics[i].text;
+                      else break;
+                    }
+                    if (active) lyricBanner.innerText = '♪ ' + active;
+                  }
+                });
+                el.addEventListener('ended', nextTrack);
+              });
+
+              seekBar.addEventListener('input', (e) => { activeMedia().currentTime = parseFloat(e.target.value); });
+              window.addEventListener('online', () => { window.location.href = 'https://ayushmobileappmusicgaaana.vercel.app/download'; });
+              setTimeout(loadOfflineTracks, 300);
+            </script>
           </body>
           </html>
           EOF
@@ -85,7 +233,7 @@ jobs:
             },
             "plugins": {
               "SplashScreen": {
-                "launchShowDuration": 3000,
+                "launchShowDuration": 2500,
                 "launchAutoHide": true,
                 "backgroundColor": "#000000",
                 "androidSplashResourceName": "splash",
@@ -107,6 +255,7 @@ jobs:
           let xml = fs.readFileSync(path, 'utf8');
           const perms = \`
               <uses-permission android:name=\"android.permission.INTERNET\" />
+              <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />
               <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
               <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\" />
               <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />
@@ -150,7 +299,7 @@ jobs:
           }
           "
 
-      - name: Inject Custom Download Engine (Pause/Resume/Cancel + Root Folder)
+      - name: Inject Custom Download Engine + Local Media Server + First Launch /download Router
         run: |
           cat <<'EOF' > android/app/src/main/java/com/music8481/app/MainActivity.java
           package com.music8481.app;
@@ -164,11 +313,14 @@ jobs:
           import android.content.Context;
           import android.content.Intent;
           import android.content.IntentFilter;
+          import android.content.SharedPreferences;
           import android.content.pm.ActivityInfo;
           import android.content.pm.PackageManager;
           import android.content.res.Configuration;
           import android.media.AudioManager;
           import android.media.MediaScannerConnection;
+          import android.net.ConnectivityManager;
+          import android.net.NetworkCapabilities;
           import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
@@ -185,6 +337,8 @@ jobs:
           import android.webkit.JavascriptInterface;
           import android.webkit.URLUtil;
           import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebResourceResponse;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.widget.FrameLayout;
@@ -198,14 +352,26 @@ jobs:
           import androidx.core.view.WindowInsetsControllerCompat;
 
           import com.getcapacitor.BridgeActivity;
+          import com.getcapacitor.BridgeWebViewClient;
+
+          import org.json.JSONArray;
+          import org.json.JSONObject;
 
           import java.io.File;
+          import java.io.FileInputStream;
+          import java.io.IOException;
           import java.io.InputStream;
           import java.io.RandomAccessFile;
           import java.net.HttpURLConnection;
           import java.net.URL;
+          import java.net.URLDecoder;
+          import java.net.URLEncoder;
+          import java.nio.charset.StandardCharsets;
           import java.util.ArrayList;
+          import java.util.Arrays;
+          import java.util.HashMap;
           import java.util.List;
+          import java.util.Map;
           import java.util.concurrent.ConcurrentHashMap;
           import java.util.concurrent.atomic.AtomicInteger;
 
@@ -214,6 +380,7 @@ jobs:
               private boolean isVideoFullscreen = false;
               private boolean isVideoModeActive = false;
               private String pendingDownloadFilename = null;
+              private boolean initialRouteHandled = false;
 
               private static final String CHANNEL_ID = "music8481_download_channel";
               private static final String ACTION_PAUSE = "com.music8481.app.ACTION_PAUSE";
@@ -223,6 +390,42 @@ jobs:
               private NotificationManager notificationManager;
               private final AtomicInteger notificationIdCounter = new AtomicInteger(2000);
               private final ConcurrentHashMap<Integer, DownloadTask> activeTasks = new ConcurrentHashMap<>();
+
+              // =========================================================================
+              // 🔥 STREAMING RANGE INPUT STREAM FOR INSTANT LOCAL MP3/MP4 SCRUBBING
+              // =========================================================================
+              private static class RangeFileInputStream extends InputStream {
+                  private final RandomAccessFile raf;
+                  private long remaining;
+
+                  RangeFileInputStream(File file, long startOffset, long length) throws IOException {
+                      this.raf = new RandomAccessFile(file, "r");
+                      this.raf.seek(startOffset);
+                      this.remaining = length;
+                  }
+
+                  @Override
+                  public int read() throws IOException {
+                      if (remaining <= 0) return -1;
+                      int b = raf.read();
+                      if (b != -1) remaining--;
+                      return b;
+                  }
+
+                  @Override
+                  public int read(byte[] b, int off, int len) throws IOException {
+                      if (remaining <= 0) return -1;
+                      int toRead = (int) Math.min(len, remaining);
+                      int read = raf.read(b, off, toRead);
+                      if (read > 0) remaining -= read;
+                      return read;
+                  }
+
+                  @Override
+                  public void close() throws IOException {
+                      raf.close();
+                  }
+              }
 
               // ========================================================
               // 🔥 CUSTOM MULTI-THREADED DOWNLOAD & NOTIFICATION ENGINE
@@ -473,6 +676,46 @@ jobs:
                   return rootDir;
               }
 
+              private List<File> getAllDownloadDirectories() {
+                  List<File> dirs = new ArrayList<>();
+                  File d1 = new File(Environment.getExternalStorageDirectory(), "Music8481/Download");
+                  File d2 = new File(Environment.getExternalStorageDirectory(), "Music8481/Downloads");
+                  if (!d1.exists()) d1.mkdirs();
+                  dirs.add(d1);
+                  if (d2.exists()) dirs.add(d2);
+                  return dirs;
+              }
+
+              private File findLocalMediaFile(String fileName) {
+                  for (File dir : getAllDownloadDirectories()) {
+                      File f = new File(dir, fileName);
+                      if (f.exists() && f.isFile()) return f;
+                  }
+                  return null;
+              }
+
+              private String readTextFile(File file) {
+                  try (FileInputStream fis = new FileInputStream(file)) {
+                      byte[] data = new byte[(int) file.length()];
+                      fis.read(data);
+                      return new String(data, StandardCharsets.UTF_8);
+                  } catch (Exception e) {
+                      return "";
+                  }
+              }
+
+              private boolean isNetworkOnline() {
+                  ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                  if (cm == null) return false;
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      NetworkCapabilities cap = cm.getNetworkCapabilities(cm.getActiveNetwork());
+                      return cap != null && (cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                              cap.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                              cap.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
+                  }
+                  return cm.getActiveNetworkInfo() != null && cm.getActiveNetworkInfo().isConnected();
+              }
+
               private void createNotificationChannel() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel channel = new NotificationChannel(
@@ -499,7 +742,6 @@ jobs:
               }
 
               private void requestAllPermissions() {
-                  // 1. Request All Files Access on Android 11+ to allow standalone /storage/emulated/0/Music8481/Download folder
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                       if (!Environment.isExternalStorageManager()) {
                           try {
@@ -513,7 +755,6 @@ jobs:
                       }
                   }
 
-                  // 2. Request Runtime Notification & Media Permissions
                   List<String> listPermissionsNeeded = new ArrayList<>();
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                       if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -573,7 +814,88 @@ jobs:
                       }
                   }
 
-                  // Chunked Blob Streamer with Pause, Resume, Cancel & Live Notification %
+                  // =========================================================================
+                  // 🔥 SCAN /Music8481/Download & PAIR EXACT SAME TITLE .LRC FILES
+                  // =========================================================================
+                  @JavascriptInterface
+                  public String getDownloadedFiles() {
+                      JSONArray result = new JSONArray();
+                      try {
+                          List<File> allFiles = new ArrayList<>();
+                          for (File dir : getAllDownloadDirectories()) {
+                              File[] files = dir.listFiles();
+                              if (files != null) {
+                                  allFiles.addAll(Arrays.asList(files));
+                              }
+                          }
+
+                          Map<String, File> lrcMap = new HashMap<>();
+                          for (File f : allFiles) {
+                              if (f.isFile() && f.getName().toLowerCase().endsWith(".lrc")) {
+                                  String name = f.getName();
+                                  String base = name.substring(0, name.lastIndexOf('.')).trim().toLowerCase();
+                                  lrcMap.put(base, f);
+                              }
+                          }
+
+                          allFiles.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+
+                          for (File f : allFiles) {
+                              if (!f.isFile()) continue;
+                              String name = f.getName();
+                              int dotIdx = name.lastIndexOf('.');
+                              if (dotIdx <= 0) continue;
+
+                              String baseName = name.substring(0, dotIdx).trim();
+                              String ext = name.substring(dotIdx + 1).toLowerCase();
+
+                              if (ext.equals("mp3") || ext.equals("mp4") || ext.equals("m4a") || ext.equals("wav") || ext.equals("webm") || ext.equals("ogg")) {
+                                  JSONObject obj = new JSONObject();
+                                  obj.put("name", name);
+                                  obj.put("baseName", baseName);
+                                  obj.put("ext", ext);
+                                  obj.put("size", f.length());
+                                  obj.put("lastModified", f.lastModified());
+                                  obj.put("isVideo", ext.equals("mp4") || ext.equals("webm"));
+                                  String encoded = URLEncoder.encode(name, "UTF-8").replace("+", "%20");
+                                  obj.put("url", "https://localmedia.music8481.app/" + encoded);
+
+                                  File matchingLrc = lrcMap.get(baseName.toLowerCase());
+                                  if (matchingLrc != null && matchingLrc.exists()) {
+                                      obj.put("hasLyrics", true);
+                                      obj.put("lrcName", matchingLrc.getName());
+                                      obj.put("lrcContent", readTextFile(matchingLrc));
+                                  } else {
+                                      obj.put("hasLyrics", false);
+                                      obj.put("lrcName", "");
+                                      obj.put("lrcContent", "");
+                                  }
+                                  result.put(obj);
+                              }
+                          }
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                      }
+                      return result.toString();
+                  }
+
+                  @JavascriptInterface
+                  public boolean deleteDownloadedFile(String fileName) {
+                      try {
+                          File f = findLocalMediaFile(fileName);
+                          if (f != null && f.exists()) {
+                              int dot = fileName.lastIndexOf('.');
+                              if (dot > 0) {
+                                  String base = fileName.substring(0, dot);
+                                  File lrc = findLocalMediaFile(base + ".lrc");
+                                  if (lrc != null && lrc.exists()) lrc.delete();
+                              }
+                              return f.delete();
+                          }
+                      } catch (Exception ignored) {}
+                      return false;
+                  }
+
                   @JavascriptInterface
                   public int initBlobDownload(String fileName, String mimeType, long totalSize) {
                       int id = notificationIdCounter.incrementAndGet();
@@ -709,6 +1031,90 @@ jobs:
 
                       webView.removeJavascriptInterface("AndroidApp");
                       webView.addJavascriptInterface(new WebAppInterface(), "AndroidApp");
+
+                      // =========================================================================
+                      // 🔥 LOCAL MEDIA SERVER INTERCEPTOR (Serves /Music8481/Download to Vercel)
+                      // =========================================================================
+                      webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
+                          @Override
+                          public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                              Uri uri = request.getUrl();
+                              if (uri != null && "localmedia.music8481.app".equalsIgnoreCase(uri.getHost())) {
+                                  try {
+                                      String rawPath = uri.getPath();
+                                      if (rawPath != null && rawPath.startsWith("/")) rawPath = rawPath.substring(1);
+                                      String fileName = URLDecoder.decode(rawPath, "UTF-8");
+                                      File file = findLocalMediaFile(fileName);
+
+                                      if (file != null && file.exists()) {
+                                          String lower = fileName.toLowerCase();
+                                          String mime = "audio/mpeg";
+                                          if (lower.endsWith(".mp4")) mime = "video/mp4";
+                                          else if (lower.endsWith(".webm")) mime = "video/webm";
+                                          else if (lower.endsWith(".m4a")) mime = "audio/mp4";
+                                          else if (lower.endsWith(".wav")) mime = "audio/wav";
+                                          else if (lower.endsWith(".lrc")) mime = "text/plain";
+
+                                          long fileLen = file.length();
+                                          String rangeHeader = request.getRequestHeaders() != null ? request.getRequestHeaders().get("Range") : null;
+
+                                          Map<String, String> headers = new HashMap<>();
+                                          headers.put("Access-Control-Allow-Origin", "*");
+                                          headers.put("Accept-Ranges", "bytes");
+
+                                          if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                                              String[] parts = rangeHeader.substring(6).split("-");
+                                              long start = Long.parseLong(parts[0]);
+                                              long end = (parts.length > 1 && !parts[1].isEmpty()) ? Long.parseLong(parts[1]) : fileLen - 1;
+                                              if (end >= fileLen) end = fileLen - 1;
+                                              long contentLen = end - start + 1;
+
+                                              headers.put("Content-Range", "bytes " + start + "-" + end + "/" + fileLen);
+                                              headers.put("Content-Length", String.valueOf(contentLen));
+
+                                              return new WebResourceResponse(
+                                                      mime,
+                                                      "UTF-8",
+                                                      206,
+                                                      "Partial Content",
+                                                      headers,
+                                                      new RangeFileInputStream(file, start, contentLen)
+                                              );
+                                          } else {
+                                              headers.put("Content-Length", String.valueOf(fileLen));
+                                              return new WebResourceResponse(
+                                                      mime,
+                                                      "UTF-8",
+                                                      200,
+                                                      "OK",
+                                                      headers,
+                                                      new FileInputStream(file)
+                                              );
+                                          }
+                                      }
+                                  } catch (Exception e) {
+                                      e.printStackTrace();
+                                  }
+                              }
+                              return super.shouldInterceptRequest(view, request);
+                          }
+                      });
+
+                      // =========================================================================
+                      // 🔥 FIRST LAUNCH AUTO-ROUTE TO /download & OFFLINE FALLBACK
+                      // =========================================================================
+                      if (!initialRouteHandled) {
+                          initialRouteHandled = true;
+                          SharedPreferences prefs = getSharedPreferences("Music8481Prefs", MODE_PRIVATE);
+                          boolean isFirstOpen = prefs.getBoolean("is_first_open", true);
+
+                          if (!isNetworkOnline()) {
+                              webView.loadUrl("file:///android_asset/public/error.html");
+                          } else if (isFirstOpen) {
+                              prefs.edit().putBoolean("is_first_open", false).apply();
+                              webView.loadUrl("https://ayushmobileappmusicgaaana.vercel.app/download");
+                          }
+                      }
 
                       webView.setDownloadListener(new DownloadListener() {
                           @Override
