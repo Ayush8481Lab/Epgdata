@@ -30,7 +30,7 @@ jobs:
           npm install @capgo/capacitor-media-session
           npm install @capacitor/splash-screen
 
-      - name: Initialize Capacitor Config & Built-in Offline Download Manager UI
+      - name: Initialize Capacitor Config & Premium Colorful Offline UI
         run: |
           mkdir -p www
           cat <<'EOF' > www/index.html
@@ -40,7 +40,7 @@ jobs:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
             <title>Music8481</title>
-            <style>body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; }</style>
+            <style>body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #07070b; }</style>
           </head>
           <body></body>
           </html>
@@ -52,57 +52,122 @@ jobs:
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-            <title>Offline Downloads - Music8481</title>
+            <title>Music8481 Offline Vault</title>
             <style>
               * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-              body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0 0 165px 0; user-select: none; }
-              header { position: sticky; top: 0; z-index: 20; background: rgba(0,0,0,0.92); backdrop-filter: blur(12px); padding: 18px 16px 12px; border-bottom: 1px solid #222; }
+              body { background: #07070b; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0 0 175px 0; user-select: none; overflow-x: hidden; }
+              .glow-1 { position: fixed; top: -80px; left: -80px; width: 260px; height: 260px; background: rgba(16,185,129,0.22); filter: blur(100px); pointer-events: none; z-index: 0; }
+              .glow-2 { position: fixed; top: 180px; right: -90px; width: 260px; height: 260px; background: rgba(217,70,239,0.16); filter: blur(110px); pointer-events: none; z-index: 0; }
+              header { position: sticky; top: 0; z-index: 20; background: rgba(7,7,11,0.82); backdrop-filter: blur(16px); padding: 22px 16px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
               .top-row { display: flex; align-items: center; justify-content: space-between; }
-              .badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 700; margin-left: 8px; }
-              .btn { background: #1DB954; color: #000; border: none; padding: 8px 14px; border-radius: 99px; font-size: 12px; font-weight: 700; cursor: pointer; }
-              .sub { color: #888; font-size: 12px; margin-top: 4px; }
-              .list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
-              .card { display: flex; align-items: center; justify-content: space-between; background: #121212; border: 1px solid #242424; padding: 12px; border-radius: 16px; cursor: pointer; }
-              .card.active { border-color: #1DB954; background: rgba(29, 185, 84, 0.14); }
-              .title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-              .meta { font-size: 11px; color: #999; margin-top: 3px; display: flex; gap: 6px; align-items: center; }
-              .lrc-tag { background: rgba(29,185,84,0.2); color: #1DB954; border: 1px solid rgba(29,185,84,0.4); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
-              .player { position: fixed; bottom: 0; left: 0; right: 0; background: #0a0a0a; border-top: 1px solid #262626; padding: 12px 16px 18px; z-index: 30; }
-              .lyric-banner { background: rgba(29,185,84,0.12); border: 1px solid rgba(29,185,84,0.3); color: #1DB954; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; text-align: center; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-              .controls { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
-              input[type=range] { width: 100%; accent-color: #1DB954; }
-              #videoBox { width: 100%; max-height: 240px; background: #000; display: none; border-bottom: 1px solid #222; }
+              .brand { font-size: 20px; font-weight: 800; background: linear-gradient(90deg, #fff, #6ee7b7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+              .badge { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 10px; padding: 3px 8px; border-radius: 99px; font-weight: 800; margin-left: 8px; }
+              .btn-online { background: linear-gradient(135deg, #1DB954, #34d399); color: #000; border: none; padding: 8px 14px; border-radius: 14px; font-size: 12px; font-weight: 800; cursor: pointer; }
+              .sub { color: #9ca3af; font-size: 11px; margin-top: 4px; }
+              .hero { margin: 16px 16px 6px; padding: 16px; border-radius: 24px; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(139,92,246,0.25)); z-index: 5; }
+              .hero img, .art-box img { width: 100%; height: 100%; object-fit: cover; }
+              .art-box { width: 54px; height: 54px; border-radius: 16px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, #10b981, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+              .list { padding: 10px 16px; display: flex; flex-direction: column; gap: 10px; position: relative; z-index: 5; }
+              .card { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 10px 12px; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+              .card.active { border-color: rgba(52,211,153,0.6); background: linear-gradient(90deg, rgba(16,185,129,0.22), rgba(217,70,239,0.1)); }
+              .title { font-size: 14px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 205px; }
+              .artist { font-size: 12px; font-weight: 600; color: #6ee7b7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 205px; margin-top: 2px; }
+              .meta { font-size: 10px; color: #9ca3af; margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+              .lrc-tag { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); padding: 1px 6px; border-radius: 5px; font-size: 9px; font-weight: 800; }
+              
+              /* Mini Player 30px Up From Bottom */
+              .mini-player { position: fixed; bottom: 30px; left: 12px; right: 12px; background: rgba(12,12,18,0.94); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.16); border-radius: 24px; z-index: 30; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.85); }
+              .mini-prog { width: 100%; height: 3px; background: rgba(255,255,255,0.1); }
+              .mini-prog-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #1DB954, #22d3ee); }
+              .mini-lyric { background: rgba(16,185,129,0.14); color: #6ee7b7; font-size: 11px; font-weight: 700; text-align: center; padding: 4px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .mini-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
+              .ctrl-btn { background: rgba(255,255,255,0.08); color: #fff; border: none; width: 38px; height: 38px; border-radius: 14px; font-size: 14px; font-weight: 800; cursor: pointer; }
+              .play-btn { background: linear-gradient(135deg, #1DB954, #34d399); color: #000; border: none; width: 44px; height: 44px; border-radius: 16px; font-size: 16px; font-weight: 900; cursor: pointer; }
+
+              /* Full Screen Modal */
+              .full-modal { position: fixed; inset: 0; background: #050508; z-index: 50; display: none; flex-direction: column; justify-content: space-between; padding: 24px 22px 42px 22px; overflow: hidden; }
+              .full-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(45px) brightness(0.45); transform: scale(1.25); z-index: 0; pointer-events: none; }
+              .full-top, .full-center, .full-bottom { position: relative; z-index: 2; }
+              .full-top { display: flex; align-items: center; justify-content: space-between; }
+              .full-art { width: 270px; height: 270px; border-radius: 32px; overflow: hidden; margin: 0 auto; box-shadow: 0 24px 60px rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.18); background: linear-gradient(135deg, #10b981, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 54px; }
+              .lyrics-box { height: 300px; overflow-y: auto; text-align: center; padding: 20px 8px; display: none; }
+              .lyric-line { color: rgba(255,255,255,0.45); font-size: 15px; font-weight: 600; margin: 14px 0; transition: 0.25s; }
+              .lyric-line.active { color: #6ee7b7; font-size: 21px; font-weight: 900; transform: scale(1.04); }
+              input[type=range] { width: 100%; accent-color: #1DB954; height: 5px; }
             </style>
           </head>
           <body>
+            <div class="glow-1"></div>
+            <div class="glow-2"></div>
+
             <header>
               <div class="top-row">
                 <div style="display:flex;align-items:center;">
-                  <h1 style="font-size:18px;margin:0;">My Downloads</h1>
-                  <span class="badge">OFFLINE MODE</span>
+                  <span class="brand">Music8481 Vault</span>
+                  <span class="badge">OFFLINE</span>
                 </div>
-                <button class="btn" onclick="window.location.href='https://ayushmobileappmusicgaaana.vercel.app/download'">Go Online</button>
+                <button class="btn-online" onclick="window.location.href='https://ayushmobileappmusicgaaana.vercel.app/download'">Online Mode</button>
               </div>
-              <div class="sub">Folder: /Music8481/Download • Plays Offline with .LRC</div>
+              <div class="sub">ID3 Banner & Artist • /Music8481/Download</div>
             </header>
 
-            <video id="videoBox" controls playsinline></video>
+            <div id="heroBox"></div>
+            <video id="videoBox" controls playsinline style="width:92%;margin:10px auto;display:none;border-radius:20px;background:#000;"></video>
             <audio id="audioBox" preload="auto"></audio>
 
             <div class="list" id="trackList"></div>
 
-            <div class="player" id="playerBar" style="display:none;">
-              <div class="lyric-banner" id="lyricBanner" style="display:none;">♪ ...</div>
-              <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
-              <div class="controls">
-                <div style="min-width:0;flex:1;padding-right:10px;">
-                  <div class="title" id="nowTitle">Not Playing</div>
-                  <div class="meta" id="nowSub">Offline Ready</div>
+            <!-- Floating Mini Player (30px Up) -->
+            <div class="mini-player" id="miniPlayer" style="display:none;" onclick="openFull(true)">
+              <div class="mini-prog"><div class="mini-prog-bar" id="miniBar"></div></div>
+              <div class="mini-lyric" id="miniLyric" style="display:none;">♪ ...</div>
+              <div class="mini-row">
+                <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
+                  <div class="art-box" id="miniArt" style="width:46px;height:46px;border-radius:14px;">♪</div>
+                  <div style="min-width:0;flex:1;">
+                    <div class="title" id="miniTitle">Not Playing</div>
+                    <div class="artist" id="miniArtist">Unknown Artist</div>
+                  </div>
                 </div>
-                <div style="display:flex;gap:12px;align-items:center;">
-                  <button class="btn" onclick="prevTrack()" style="background:#222;color:#fff;">⏮</button>
-                  <button class="btn" id="playBtn" onclick="togglePlay()">▶</button>
-                  <button class="btn" onclick="nextTrack()" style="background:#222;color:#fff;">⏭</button>
+                <div style="display:flex;gap:8px;align-items:center;" onclick="event.stopPropagation();">
+                  <button class="ctrl-btn" onclick="prevTrack()">⏮</button>
+                  <button class="play-btn" id="miniPlayBtn" onclick="togglePlay()">▶</button>
+                  <button class="ctrl-btn" onclick="nextTrack()">⏭</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Full-Screen Player Modal -->
+            <div class="full-modal" id="fullModal">
+              <img id="fullBg" class="full-bg" style="display:none;" />
+              <div class="full-top">
+                <button class="ctrl-btn" onclick="openFull(false)">▼</button>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-online" id="tabArtBtn" onclick="switchTab('art')">Banner</button>
+                  <button class="ctrl-btn" id="tabLrcBtn" style="width:auto;padding:0 12px;" onclick="switchTab('lrc')">Lyrics</button>
+                </div>
+                <div style="width:38px;"></div>
+              </div>
+
+              <div class="full-center">
+                <div class="full-art" id="fullArtBox">♪</div>
+                <div class="lyrics-box" id="fullLyricsBox"></div>
+              </div>
+
+              <div class="full-bottom">
+                <div style="margin-bottom:14px;">
+                  <div style="font-size:22px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="fullTitle">Track</div>
+                  <div style="font-size:14px;font-weight:700;color:#6ee7b7;margin-top:3px;" id="fullArtist">Artist</div>
+                </div>
+                <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:#9ca3af;margin-top:4px;">
+                  <span id="curTime">0:00</span>
+                  <span id="durTime">0:00</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-evenly;margin-top:16px;">
+                  <button class="ctrl-btn" style="width:50px;height:50px;font-size:18px;" onclick="prevTrack()">⏮</button>
+                  <button class="play-btn" id="fullPlayBtn" style="width:66px;height:66px;border-radius:24px;font-size:24px;" onclick="togglePlay()">▶</button>
+                  <button class="ctrl-btn" style="width:50px;height:50px;font-size:18px;" onclick="nextTrack()">⏭</button>
                 </div>
               </div>
             </div>
@@ -114,7 +179,12 @@ jobs:
               const audioEl = document.getElementById('audioBox');
               const videoEl = document.getElementById('videoBox');
               const seekBar = document.getElementById('seekBar');
-              const lyricBanner = document.getElementById('lyricBanner');
+
+              function fmtTime(s) {
+                if (!s || isNaN(s)) return '0:00';
+                const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+                return m + ':' + (sec < 10 ? '0' : '') + sec;
+              }
 
               function parseLrc(text) {
                 if (!text) return [];
@@ -132,24 +202,46 @@ jobs:
                 return out.sort((a,b) => a.time - b.time);
               }
 
+              function artHtml(t) {
+                if (t.hasArt && t.artUrl) {
+                  return `<img src="${t.artUrl}" onerror="this.style.display='none'" />`;
+                }
+                return t.isVideo ? '🎬' : '♪';
+              }
+
               function loadOfflineTracks() {
                 if (!window.AndroidApp || !window.AndroidApp.getDownloadedFiles) return;
                 tracks = JSON.parse(window.AndroidApp.getDownloadedFiles() || "[]");
                 const container = document.getElementById('trackList');
                 if (!tracks.length) {
-                  container.innerHTML = '<p style="text-align:center;color:#666;margin-top:60px;">No files in /Music8481/Download yet.</p>';
+                  container.innerHTML = '<p style="text-align:center;color:#888;margin-top:50px;">No tracks in /Music8481/Download yet.</p>';
                   return;
                 }
+                const feat = currentIdx >= 0 ? tracks[currentIdx] : tracks[0];
+                document.getElementById('heroBox').innerHTML = `
+                  <div class="hero" onclick="playIndex(${currentIdx >= 0 ? currentIdx : 0});openFull(true);">
+                    <div class="art-box" style="width:72px;height:72px;border-radius:20px;">${artHtml(feat)}</div>
+                    <div style="min-width:0;flex:1;">
+                      <div style="font-size:10px;font-weight:800;color:#6ee7b7;text-transform:uppercase;">ID3 Featured Banner</div>
+                      <div class="title" style="font-size:17px;max-width:100%;margin-top:2px;">${feat.title || feat.baseName}</div>
+                      <div class="artist">${feat.artist || 'Unknown Artist'}</div>
+                    </div>
+                  </div>
+                `;
                 container.innerHTML = tracks.map((t, i) => `
                   <div class="card ${i === currentIdx ? 'active' : ''}" onclick="playIndex(${i})">
-                    <div>
-                      <div class="title">${t.baseName}</div>
-                      <div class="meta">
-                        <span>${(t.size / (1024*1024)).toFixed(1)} MB</span> • <span>${t.ext.toUpperCase()}</span>
-                        ${t.hasLyrics ? '<span class="lrc-tag">LRC LYRICS</span>' : ''}
+                    <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
+                      <div class="art-box">${artHtml(t)}</div>
+                      <div style="min-width:0;flex:1;">
+                        <div class="title">${t.title || t.baseName}</div>
+                        <div class="artist">${t.artist || 'Unknown Artist'}</div>
+                        <div class="meta">
+                          <span>${(t.size / (1024*1024)).toFixed(1)} MB</span> • <span>${t.ext.toUpperCase()}</span>
+                          ${t.hasLyrics ? '<span class="lrc-tag">LRC</span>' : ''}
+                        </div>
                       </div>
                     </div>
-                    <span style="color:#1DB954;font-weight:700;">▶</span>
+                    <span style="color:#6ee7b7;font-weight:900;padding-left:8px;">▶</span>
                   </div>
                 `).join('');
               }
@@ -159,10 +251,28 @@ jobs:
                 currentIdx = i;
                 const t = tracks[i];
                 currentLyrics = t.hasLyrics ? parseLrc(t.lrcContent) : [];
-                document.getElementById('playerBar').style.display = 'block';
-                document.getElementById('nowTitle').innerText = t.baseName;
-                document.getElementById('nowSub').innerText = t.hasLyrics ? 'Synced .LRC Active' : 'Local Storage';
-                lyricBanner.style.display = currentLyrics.length ? 'block' : 'none';
+
+                document.getElementById('miniPlayer').style.display = 'block';
+                document.getElementById('miniTitle').innerText = t.title || t.baseName;
+                document.getElementById('miniArtist').innerText = t.artist || 'Unknown Artist';
+                document.getElementById('miniArt').innerHTML = artHtml(t);
+
+                document.getElementById('fullTitle').innerText = t.title || t.baseName;
+                document.getElementById('fullArtist').innerText = (t.artist || 'Unknown Artist') + (t.album ? ' • ' + t.album : '');
+                document.getElementById('fullArtBox').innerHTML = artHtml(t);
+
+                const bg = document.getElementById('fullBg');
+                if (t.hasArt && t.artUrl) { bg.src = t.artUrl; bg.style.display = 'block'; }
+                else { bg.style.display = 'none'; }
+
+                const lrcBox = document.getElementById('fullLyricsBox');
+                if (currentLyrics.length) {
+                  lrcBox.innerHTML = currentLyrics.map((l, idx) => `<div class="lyric-line" id="lrc-${idx}">${l.text}</div>`).join('');
+                  document.getElementById('miniLyric').style.display = 'block';
+                } else {
+                  lrcBox.innerHTML = '<div style="margin-top:90px;color:#888;">No .LRC lyrics found for this song</div>';
+                  document.getElementById('miniLyric').style.display = 'none';
+                }
 
                 if (t.isVideo) {
                   audioEl.pause();
@@ -175,8 +285,19 @@ jobs:
                   audioEl.src = t.url;
                   audioEl.play();
                 }
-                document.getElementById('playBtn').innerText = '❚❚';
+                document.getElementById('miniPlayBtn').innerText = '❚❚';
+                document.getElementById('fullPlayBtn').innerText = '❚❚';
                 loadOfflineTracks();
+              }
+
+              function openFull(show) {
+                document.getElementById('fullModal').style.display = show ? 'flex' : 'none';
+              }
+
+              function switchTab(tab) {
+                const isArt = tab === 'art';
+                document.getElementById('fullArtBox').style.display = isArt ? 'flex' : 'none';
+                document.getElementById('fullLyricsBox').style.display = isArt ? 'none' : 'block';
               }
 
               function activeMedia() {
@@ -185,8 +306,15 @@ jobs:
 
               function togglePlay() {
                 const m = activeMedia();
-                if (m.paused) { m.play(); document.getElementById('playBtn').innerText = '❚❚'; }
-                else { m.pause(); document.getElementById('playBtn').innerText = '▶'; }
+                if (m.paused) {
+                  m.play();
+                  document.getElementById('miniPlayBtn').innerText = '❚❚';
+                  document.getElementById('fullPlayBtn').innerText = '❚❚';
+                } else {
+                  m.pause();
+                  document.getElementById('miniPlayBtn').innerText = '▶';
+                  document.getElementById('fullPlayBtn').innerText = '▶';
+                }
               }
 
               function nextTrack() { if (tracks.length) playIndex((currentIdx + 1) % tracks.length); }
@@ -197,14 +325,23 @@ jobs:
                   if (el.duration) {
                     seekBar.max = el.duration;
                     seekBar.value = el.currentTime;
+                    document.getElementById('curTime').innerText = fmtTime(el.currentTime);
+                    document.getElementById('durTime').innerText = fmtTime(el.duration);
+                    document.getElementById('miniBar').style.width = ((el.currentTime / el.duration) * 100) + '%';
                   }
                   if (currentLyrics.length) {
-                    let active = '';
+                    let activeIdx = -1;
                     for (let i = 0; i < currentLyrics.length; i++) {
-                      if (el.currentTime >= currentLyrics[i].time) active = currentLyrics[i].text;
+                      if (el.currentTime >= currentLyrics[i].time) activeIdx = i;
                       else break;
                     }
-                    if (active) lyricBanner.innerText = '♪ ' + active;
+                    if (activeIdx >= 0) {
+                      document.getElementById('miniLyric').innerText = '♪ ' + currentLyrics[activeIdx].text;
+                      document.querySelectorAll('.lyric-line').forEach((node, idx) => {
+                        node.classList.toggle('active', idx === activeIdx);
+                        if (idx === activeIdx) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      });
+                    }
                   }
                 });
                 el.addEventListener('ended', nextTrack);
@@ -299,7 +436,7 @@ jobs:
           }
           "
 
-      - name: Inject Custom Download Engine + Local Media Server + First Launch /download Router
+      - name: Inject Custom Download Engine + ID3v2 Metadata & Embedded Cover Art Server
         run: |
           cat <<'EOF' > android/app/src/main/java/com/music8481/app/MainActivity.java
           package com.music8481.app;
@@ -318,6 +455,7 @@ jobs:
           import android.content.pm.PackageManager;
           import android.content.res.Configuration;
           import android.media.AudioManager;
+          import android.media.MediaMetadataRetriever;
           import android.media.MediaScannerConnection;
           import android.net.ConnectivityManager;
           import android.net.NetworkCapabilities;
@@ -357,6 +495,7 @@ jobs:
           import org.json.JSONArray;
           import org.json.JSONObject;
 
+          import java.io.ByteArrayInputStream;
           import java.io.File;
           import java.io.FileInputStream;
           import java.io.IOException;
@@ -391,9 +530,6 @@ jobs:
               private final AtomicInteger notificationIdCounter = new AtomicInteger(2000);
               private final ConcurrentHashMap<Integer, DownloadTask> activeTasks = new ConcurrentHashMap<>();
 
-              // =========================================================================
-              // 🔥 STREAMING RANGE INPUT STREAM FOR INSTANT LOCAL MP3/MP4 SCRUBBING
-              // =========================================================================
               private static class RangeFileInputStream extends InputStream {
                   private final RandomAccessFile raf;
                   private long remaining;
@@ -427,9 +563,6 @@ jobs:
                   }
               }
 
-              // ========================================================
-              // 🔥 CUSTOM MULTI-THREADED DOWNLOAD & NOTIFICATION ENGINE
-              // ========================================================
               private class DownloadTask {
                   int id;
                   String url;
@@ -815,7 +948,7 @@ jobs:
                   }
 
                   // =========================================================================
-                  // 🔥 SCAN /Music8481/Download & PAIR EXACT SAME TITLE .LRC FILES
+                  // 🔥 SCAN /Music8481/Download + EXTRACT ID3 TITLE, ARTIST, ALBUM & ART
                   // =========================================================================
                   @JavascriptInterface
                   public String getDownloadedFiles() {
@@ -857,8 +990,39 @@ jobs:
                                   obj.put("size", f.length());
                                   obj.put("lastModified", f.lastModified());
                                   obj.put("isVideo", ext.equals("mp4") || ext.equals("webm"));
+
                                   String encoded = URLEncoder.encode(name, "UTF-8").replace("+", "%20");
                                   obj.put("url", "https://localmedia.music8481.app/" + encoded);
+
+                                  // Extract ID3v2 Tags & Check Embedded Picture
+                                  String id3Title = null;
+                                  String id3Artist = null;
+                                  String id3Album = null;
+                                  boolean hasArt = false;
+
+                                  MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                                  try {
+                                      mmr.setDataSource(f.getAbsolutePath());
+                                      id3Title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+                                      id3Artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+                                      if (id3Artist == null || id3Artist.trim().isEmpty()) {
+                                          id3Artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
+                                      }
+                                      id3Album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+                                      byte[] artBytes = mmr.getEmbeddedPicture();
+                                      if (artBytes != null && artBytes.length > 0) {
+                                          hasArt = true;
+                                      }
+                                  } catch (Exception ignored) {
+                                  } finally {
+                                      try { mmr.release(); } catch (Exception ignored) {}
+                                  }
+
+                                  obj.put("title", (id3Title != null && !id3Title.trim().isEmpty()) ? id3Title.trim() : baseName);
+                                  obj.put("artist", (id3Artist != null && !id3Artist.trim().isEmpty()) ? id3Artist.trim() : "Unknown Artist");
+                                  obj.put("album", (id3Album != null && !id3Album.trim().isEmpty()) ? id3Album.trim() : "");
+                                  obj.put("hasArt", hasArt);
+                                  obj.put("artUrl", hasArt ? ("https://localmedia.music8481.app/__art__/" + encoded) : "");
 
                                   File matchingLrc = lrcMap.get(baseName.toLowerCase());
                                   if (matchingLrc != null && matchingLrc.exists()) {
@@ -1033,7 +1197,7 @@ jobs:
                       webView.addJavascriptInterface(new WebAppInterface(), "AndroidApp");
 
                       // =========================================================================
-                      // 🔥 LOCAL MEDIA SERVER INTERCEPTOR (Serves /Music8481/Download to Vercel)
+                      // 🔥 LOCAL MEDIA & ID3 EMBEDDED ART SERVER (https://localmedia.music8481.app)
                       // =========================================================================
                       webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
                           @Override
@@ -1043,6 +1207,36 @@ jobs:
                                   try {
                                       String rawPath = uri.getPath();
                                       if (rawPath != null && rawPath.startsWith("/")) rawPath = rawPath.substring(1);
+
+                                      // Serve Embedded ID3 Cover Art Banner
+                                      if (rawPath != null && rawPath.startsWith("__art__/")) {
+                                          String artFileName = URLDecoder.decode(rawPath.substring(8), "UTF-8");
+                                          File mediaFile = findLocalMediaFile(artFileName);
+                                          if (mediaFile != null && mediaFile.exists()) {
+                                              MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                                              try {
+                                                  mmr.setDataSource(mediaFile.getAbsolutePath());
+                                                  byte[] artBytes = mmr.getEmbeddedPicture();
+                                                  if (artBytes != null && artBytes.length > 0) {
+                                                      Map<String, String> headers = new HashMap<>();
+                                                      headers.put("Access-Control-Allow-Origin", "*");
+                                                      headers.put("Cache-Control", "max-age=86400");
+                                                      return new WebResourceResponse(
+                                                              "image/jpeg",
+                                                              "UTF-8",
+                                                              200,
+                                                              "OK",
+                                                              headers,
+                                                              new ByteArrayInputStream(artBytes)
+                                                      );
+                                                  }
+                                              } finally {
+                                                  try { mmr.release(); } catch (Exception ignored) {}
+                                              }
+                                          }
+                                          return new WebResourceResponse("image/png", "UTF-8", 404, "Not Found", null, null);
+                                      }
+
                                       String fileName = URLDecoder.decode(rawPath, "UTF-8");
                                       File file = findLocalMediaFile(fileName);
 
@@ -1100,9 +1294,6 @@ jobs:
                           }
                       });
 
-                      // =========================================================================
-                      // 🔥 FIRST LAUNCH AUTO-ROUTE TO /download & OFFLINE FALLBACK
-                      // =========================================================================
                       if (!initialRouteHandled) {
                           initialRouteHandled = true;
                           SharedPreferences prefs = getSharedPreferences("Music8481Prefs", MODE_PRIVATE);
@@ -1152,7 +1343,6 @@ jobs:
                               "  if (window.__music8481Injected) return;" +
                               "  window.__music8481Injected = true;" +
                               "  " +
-                              "  /* 1. Fast Audio Switching & Preload Acceleration */" +
                               "  var OrigAudio = window.Audio;" +
                               "  window.Audio = function(src) {" +
                               "    var a = new OrigAudio(src);" +
@@ -1161,7 +1351,6 @@ jobs:
                               "  };" +
                               "  window.Audio.prototype = OrigAudio.prototype;" +
                               "  " +
-                              "  /* 2. Chunked Blob Streamer supporting Pause, Resume & Cancel */" +
                               "  window.__streamBlobToNative = function(blobUrl, fileName, fallbackMime) {" +
                               "    fetch(blobUrl).then(function(r) { return r.blob(); }).then(function(blob) {" +
                               "      var mime = blob.type || fallbackMime || 'audio/mpeg';" +
@@ -1195,7 +1384,6 @@ jobs:
                               "    });" +
                               "  };" +
                               "  " +
-                              "  /* 3. Intercept Anchor Clicks & Programmatic Downloads */" +
                               "  function handleAnchorDownload(a) {" +
                               "    if (!a || !a.href) return false;" +
                               "    var dlAttr = a.getAttribute('download');" +
@@ -1227,7 +1415,6 @@ jobs:
                               "    return origClick.apply(this, arguments);" +
                               "  };" +
                               "  " +
-                              "  /* 4. Continuous DOM Optimization & Media Preload Loop */" +
                               "  setInterval(function() {" +
                               "    var meta = document.querySelector('meta[name=\"viewport\"]');" +
                               "    var content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
