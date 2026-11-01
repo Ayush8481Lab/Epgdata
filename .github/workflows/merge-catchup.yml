@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p www src
 
-          # 1. Save initial fallback TSX from down.txt (or embedded fallback)
+          # 1. Create the fixed, production-hardened OfflinePlayer.tsx baseline
           cat <<'EOF' > src/OfflinePlayer.tsx
           "use client";
 
@@ -89,7 +89,6 @@ jobs:
           const IcChevronDown = (p: IcProps) => <Svg {...p} stroke sw={2.2}><path d="m6 9.5 6 6 6-6" /></Svg>;
           const IcMore = (p: IcProps) => <Svg {...p}><circle cx="5.5" cy="12" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="18.5" cy="12" r="1.9" /></Svg>;
           const IcExpand = (p: IcProps) => <Svg {...p} stroke sw={2}><path d="M14 4h6v6" /><path d="M10 20H4v-6" /><path d="m20 4-7 7" /><path d="m4 20 7-7" /></Svg>;
-          const IcScreen = (p: IcProps) => <Svg {...p} stroke><rect x="3" y="4.5" width="18" height="12.5" rx="3.2" /><path d="M10 8.4v5l4.1-2.5z" fill="currentColor" /><path d="M8.5 20.5h7" /></Svg>;
 
           const EqBars = React.memo(({ playing, color }: { playing: boolean; color: string }) => (
             <div className="flex items-end gap-[3px] h-[16px] w-[18px]" aria-hidden="true">
@@ -164,14 +163,14 @@ jobs:
             for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
             return Math.abs(hash) % 360;
           };
-          const extractHueFromImage = (src: string): Promise<number> => new Promise((resolve) => {
+          const extractHueFromImage = (src: string, fallbackName: string): Promise<number> => new Promise((resolve) => {
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = () => {
               try {
                 const c = document.createElement("canvas"); c.width = 32; c.height = 32;
                 const ctx = c.getContext("2d", { willReadFrequently: true });
-                if (!ctx) return resolve(0);
+                if (!ctx) return resolve(hueFromName(fallbackName));
                 ctx.drawImage(img, 0, 0, 32, 32);
                 const d = ctx.getImageData(0, 0, 32, 32).data;
                 let r = 0, g = 0, b = 0, n = 0;
@@ -179,7 +178,7 @@ jobs:
                   if (d[i + 3] < 128) continue;
                   r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
                 }
-                if (!n) return resolve(0);
+                if (!n) return resolve(hueFromName(fallbackName));
                 r /= n * 255; g /= n * 255; b /= n * 255;
                 const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
                 let h = 0;
@@ -190,13 +189,25 @@ jobs:
                   else h = ((r - g) / df + 4) / 6;
                 }
                 resolve(Math.round(h * 360));
-              } catch { resolve(0); }
+              } catch { resolve(hueFromName(fallbackName)); }
             };
-            img.onerror = () => resolve(0);
+            img.onerror = () => resolve(hueFromName(fallbackName));
             img.src = src;
           });
 
           /* ===================== HELPERS ===================== */
+          // Rewrite legacy localmedia URLs to local loopback server so playback & images always work online & offline
+          const normalizeMediaUrl = (u?: string) => {
+            if (!u) return "";
+            if (u.startsWith("https://localmedia.music8481.app/__art__/")) {
+              return u.replace("https://localmedia.music8481.app/__art__/", "http://127.0.0.1:48481/art/");
+            }
+            if (u.startsWith("https://localmedia.music8481.app/")) {
+              return u.replace("https://localmedia.music8481.app/", "http://127.0.0.1:48481/media/");
+            }
+            return u;
+          };
+
           function parseLrc(lrcText: string): LyricLine[] {
             if (!lrcText) return [];
             const lines = lrcText.split(/\r?\n/);
@@ -372,9 +383,18 @@ jobs:
                 setIsNativeApk(true);
                 try {
                   const raw = window.AndroidApp.getDownloadedFiles();
-                  const parsed: DownloadedTrack[] = JSON.parse(raw || "[]");
-                  setTracks(parsed);
-                  try { localStorage.setItem("music8481_cached_downloads", raw); } catch {}
+                  const parsed: DownloadedTrack[] = JSON.parse(raw || "[]").map((t: DownloadedTrack) => ({
+                    ...t,
+                    url: normalizeMediaUrl(t.url),
+                    artUrl: normalizeMediaUrl(t.artUrl)
+                  }));
+                  setTracks(prev => {
+                    if (prev.length === parsed.length && prev.every((p, idx) => p.name === parsed[idx].name && p.size === parsed[idx].size)) {
+                      return prev;
+                    }
+                    return parsed;
+                  });
+                  try { localStorage.setItem("music8481_cached_downloads", JSON.stringify(parsed)); } catch {}
                 } catch (e) { console.error("Native load failed", e); }
               } else if (typeof window !== "undefined") {
                 try {
@@ -386,7 +406,7 @@ jobs:
 
             useEffect(() => {
               loadFiles();
-              const id = setInterval(loadFiles, 4000);
+              const id = setInterval(loadFiles, 5000);
               const w = localStorage.getItem("off_word_sync"); if (w !== null) setIsWordSyncEnabled(w === 'true');
               const mw = localStorage.getItem("off_mini_word_sync"); if (mw !== null) setIsMiniWordSyncEnabled(mw === 'true');
               const ly = localStorage.getItem("off_lyrics_enabled"); if (ly !== null) setIsLyricsEnabled(ly === 'true');
@@ -410,8 +430,9 @@ jobs:
             useEffect(() => {
               if (!currentTrack) { setPalette(DEFAULT_PALETTE); return; }
               let cancelled = false;
-              if (currentTrack.hasArt && currentTrack.artUrl && !artErrors[currentTrack.name]) {
-                extractHueFromImage(currentTrack.artUrl).then(hue => {
+              const artSrc = normalizeMediaUrl(currentTrack.artUrl);
+              if (currentTrack.hasArt && artSrc && !artErrors[currentTrack.name]) {
+                extractHueFromImage(artSrc, currentTrack.name).then(hue => {
                   if (cancelled) return;
                   setPalette(buildPalette(hue, currentTrack.baseName));
                 });
@@ -485,7 +506,12 @@ jobs:
             }, [activeLyricIndex, isLyricsFullScreen, isExpanded]);
 
             const playTrack = useCallback((track: DownloadedTrack, openExpanded = true) => {
-              setCurrentTrack(track);
+              const normalizedTrack: DownloadedTrack = {
+                ...track,
+                url: normalizeMediaUrl(track.url),
+                artUrl: normalizeMediaUrl(track.artUrl),
+              };
+              setCurrentTrack(normalizedTrack);
               setCurrentTime(0);
               setDuration(0);
               setProgress(0);
@@ -493,17 +519,30 @@ jobs:
               setActiveLyricIndex(-1);
               setIsPlaying(true);
               if (openExpanded) setIsExpanded(true);
-              if (window.AndroidApp?.setVideoMode) window.AndroidApp.setVideoMode(track.isVideo);
-              setTimeout(() => {
-                const el = track.isVideo ? videoRef.current : audioRef.current;
-                const other = track.isVideo ? audioRef.current : videoRef.current;
-                if (other) { other.pause(); other.removeAttribute("src"); }
-                if (el) {
-                  el.src = track.url;
-                  el.load();
-                  el.play().catch(() => setIsPlaying(false));
+              if (window.AndroidApp?.setVideoMode) window.AndroidApp.setVideoMode(normalizedTrack.isVideo);
+
+              const startPlayback = () => {
+                const el = normalizedTrack.isVideo ? videoRef.current : audioRef.current;
+                const other = normalizedTrack.isVideo ? audioRef.current : videoRef.current;
+                if (other) {
+                  try { other.pause(); other.removeAttribute("src"); other.load(); } catch {}
                 }
-              }, 40);
+                if (el) {
+                  el.src = normalizedTrack.url;
+                  el.load();
+                  const playPromise = el.play();
+                  if (playPromise !== undefined) {
+                    playPromise.then(() => setIsPlaying(true)).catch((err) => {
+                      console.warn("Primary play retry:", err);
+                      setTimeout(() => {
+                        el.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+                      }, 150);
+                    });
+                  }
+                }
+              };
+
+              requestAnimationFrame(() => setTimeout(startPlayback, 20));
             }, []);
 
             const togglePlayPause = (e?: React.MouseEvent) => {
@@ -511,7 +550,7 @@ jobs:
               if (!currentTrack) { if (filteredTracks.length) playTrack(filteredTracks[0]); return; }
               const el = mediaEl();
               if (!el) return;
-              if (el.paused) { el.play(); setIsPlaying(true); }
+              if (el.paused) { el.play().then(() => setIsPlaying(true)).catch(() => {}); }
               else { el.pause(); setIsPlaying(false); }
             };
 
@@ -524,11 +563,11 @@ jobs:
               }
               if (isShuffle) {
                 const i = Math.floor(Math.random() * filteredTracks.length);
-                return playTrack(filteredTracks[i]);
+                return playTrack(filteredTracks[i], isExpanded);
               }
               const idx = filteredTracks.findIndex(t => t.name === currentTrack.name);
               const next = (idx + 1) % filteredTracks.length;
-              playTrack(filteredTracks[next]);
+              playTrack(filteredTracks[next], isExpanded);
             };
 
             const playPrev = (e?: React.MouseEvent) => {
@@ -537,7 +576,7 @@ jobs:
               const el = mediaEl();
               if (el && el.currentTime > 3) { el.currentTime = 0; return; }
               const idx = filteredTracks.findIndex(t => t.name === currentTrack.name);
-              playTrack(filteredTracks[(idx - 1 + filteredTracks.length) % filteredTracks.length]);
+              playTrack(filteredTracks[(idx - 1 + filteredTracks.length) % filteredTracks.length], isExpanded);
             };
 
             const handleSeekStart = () => { isSeekingRef.current = true; };
@@ -557,12 +596,13 @@ jobs:
             };
 
             const renderArt = (track: DownloadedTrack, sizeClass = "w-full h-full", rounded = "rounded-lg") => {
-              const showArt = track.hasArt && track.artUrl && !artErrors[track.name];
+              const artSrc = normalizeMediaUrl(track.artUrl);
+              const showArt = track.hasArt && artSrc && !artErrors[track.name];
               const gradHue = hueFromName(track.name);
               return (
                 <div className={`${sizeClass} ${rounded} relative overflow-hidden bg-[#282828] flex items-center justify-center`} style={!showArt ? { background: `linear-gradient(135deg, ${hs(gradHue, 40, 32)}, ${hs(gradHue + 30, 40, 18)})` } : undefined}>
                   {showArt ? (
-                    <img src={track.artUrl} alt={track.title || track.baseName} draggable={false}
+                    <img src={artSrc} alt={track.title || track.baseName} draggable={false}
                       className="w-full h-full object-cover no-select pointer-events-none"
                       onError={() => setArtErrors(p => ({ ...p, [track.name]: true }))} />
                   ) : (
@@ -638,7 +678,7 @@ jobs:
                   <p className="text-sm text-zinc-400 text-center max-w-xs mb-6">{isNativeApk ? "Download songs and they will appear here." : "Open this page in the Music8481 Android app to load your local library."}</p>
                   <div className="flex gap-3">
                     <button onClick={loadFiles} className="px-5 py-2.5 rounded-2xl bg-emerald-500 text-black font-bold text-sm">Refresh</button>
-                    <button onClick={() => window.location.href = "https://ayushmobileappmusicgaaana.vercel.app"} className="px-5 py-2.5 rounded-2xl bg-white/10 text-white font-bold text-sm border border-white/15">Go Online</button>
+                    <button onClick={() => window.location.href = "https://ayushmobileappmusicgaaana.vercel.app"} className="px-5 py-2.5 rounded-2xl bg-white/10 text-white font-bold text-sm border border-white/15">Home</button>
                   </div>
                 </div>
               );
@@ -651,8 +691,7 @@ jobs:
                 <style dangerouslySetInnerHTML={{ __html: `
                   * { -webkit-tap-highlight-color: transparent; }
                   .player-root { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
-                  img, video, canvas { pointer-events: none; -webkit-touch-callout: none; user-select: none; }
-                  video::-webkit-media-controls { display: none !important; }
+                  img, canvas { pointer-events: none; -webkit-touch-callout: none; user-select: none; }
                   @keyframes marquee-pp { 0%, 18% { transform: translate3d(0,0,0); } 82%, 100% { transform: translate3d(var(--d,0px),0,0); } }
                   .marquee-pp { animation: marquee-pp var(--t, 8s) ease-in-out infinite alternate; will-change: transform; backface-visibility: hidden; }
                   @media (prefers-reduced-motion: reduce) { .marquee-pp { animation: none; } }
@@ -679,6 +718,7 @@ jobs:
 
                 <audio
                   ref={audioRef}
+                  preload="auto"
                   onTimeUpdate={(e) => {
                     const el = e.currentTarget;
                     if (!isSeekingRef.current) {
@@ -696,25 +736,6 @@ jobs:
                   onCanPlay={() => setIsBuffering(false)}
                   onEnded={() => playNext()}
                 />
-                {isVideo && (
-                  <video
-                    ref={videoRef} controls playsInline
-                    onTimeUpdate={(e) => {
-                      const el = e.currentTarget;
-                      if (!isSeekingRef.current) {
-                        setCurrentTime(el.currentTime);
-                        if (el.duration > 0) setProgress((el.currentTime / el.duration) * 100);
-                      }
-                      if (el.buffered.length && el.duration > 0)
-                        setBuffered((el.buffered.end(el.buffered.length - 1) / el.duration) * 100);
-                    }}
-                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onEnded={() => playNext()}
-                    className="hidden"
-                  />
-                )}
 
                 {!isExpanded && (
                   <div className="min-h-screen bg-[#050509] text-white flex flex-col pb-[170px] select-none relative overflow-x-hidden">
@@ -741,7 +762,7 @@ jobs:
                                 Music8481 Vault
                               </h1>
                               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-gradient-to-r from-emerald-500/25 to-cyan-500/25 text-emerald-300 border border-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.35)]">
-                                Offline
+                                Local
                               </span>
                             </div>
                             <p className="text-[11px] text-zinc-400 mt-1">
@@ -812,10 +833,10 @@ jobs:
                             <div
                               key={track.name}
                               onClick={() => playTrack(track, true)}
-                              className={`group relative flex items-center justify-between p-3 rounded-2xl border backdrop-blur-md transition-all cursor-pointer overflow-hidden ${
+                              className={`group relative flex items-center justify-between p-3 rounded-2xl border backdrop-blur-md transition-all cursor-pointer overflow-hidden active:scale-[0.99] ${
                                 isCurrent
                                   ? "bg-gradient-to-r from-emerald-500/25 via-teal-500/15 to-fuchsia-500/15 border-emerald-400/60 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.55)]"
-                                  : "bg-white/[0.045] border-white/10 hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.005]"
+                                  : "bg-white/[0.045] border-white/10 hover:bg-white/[0.08] hover:border-white/20"
                               }`}
                             >
                               {isCurrent && (
@@ -910,35 +931,34 @@ jobs:
                   </div>
                 )}
 
-                <div className={`player-root fixed inset-0 z-[99999] text-white transition-all duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? "translate-y-0 opacity-100 overflow-hidden" : "translate-y-full opacity-0 pointer-events-none"}`}>
+                <div className={`player-root fixed inset-0 z-[99999] text-white transition-all duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? "translate-y-0 opacity-100 overflow-hidden pointer-events-auto" : "translate-y-full opacity-0 pointer-events-none invisible"}`}>
                   <div className="absolute inset-0 z-0 pointer-events-none transition-all duration-700"
                     style={{ backgroundColor: palette.base, backgroundImage: isLyricsFullScreen ? 'none' : `radial-gradient(120% 55% at 50% 0%, ${palette.glow} 0%, transparent 65%), linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%)` }} />
 
-                  <div className={`absolute inset-0 z-20 overflow-x-hidden scrollbar-hide flex flex-col pointer-events-none ${isLyricsFullScreen ? 'overflow-y-hidden' : 'overflow-y-auto'}`}>
-                    <div className="w-full flex flex-col flex-shrink-0 pointer-events-auto transition-all duration-500" style={{ height: isLyricsFullScreen ? '100%' : undefined, minHeight: isLyricsFullScreen ? '100%' : '100dvh' }}>
+                  <div className={`absolute inset-0 z-20 overflow-x-hidden scrollbar-hide flex flex-col ${isExpanded ? 'pointer-events-auto' : 'pointer-events-none'} ${isLyricsFullScreen ? 'overflow-y-hidden' : 'overflow-y-auto'}`}>
+                    <div className="w-full flex flex-col flex-shrink-0 transition-all duration-500" style={{ height: isLyricsFullScreen ? '100%' : undefined, minHeight: isLyricsFullScreen ? '100%' : '100dvh' }}>
 
                       <div className={`flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-2 flex-shrink-0 w-full ${isLyricsFullScreen ? 'mt-0' : 'mt-4'}`}>
-                        <button onClick={() => { if (isLyricsFullScreen) setIsLyricsFullScreen(false); else setIsExpanded(false); }} className="p-2 -ml-2 text-white active:opacity-50 drop-shadow-md pointer-events-auto" aria-label="Close"><IcChevronDown size={28} /></button>
+                        <button onClick={() => { if (isLyricsFullScreen) setIsLyricsFullScreen(false); else setIsExpanded(false); }} className="p-2 -ml-2 text-white active:opacity-50 drop-shadow-md" aria-label="Close"><IcChevronDown size={28} /></button>
                         <div className="flex flex-col items-center flex-1 min-w-0 px-2 drop-shadow-md no-select-text">
                           <span className="text-[10px] tracking-widest text-white/70 uppercase truncate w-full text-center font-medium">Playing from Downloads</span>
                           <span className="text-[13px] font-bold text-white truncate w-full text-center mt-[2px]">{isNativeApk ? "Local Storage" : "Browser Cache"}</span>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(true); }} className="p-2 -mr-2 text-white active:opacity-50 drop-shadow-md pointer-events-auto" aria-label="Settings"><IcMore size={24} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setShowSettingsMenu(true); }} className="p-2 -mr-2 text-white active:opacity-50 drop-shadow-md" aria-label="Settings"><IcMore size={24} /></button>
                       </div>
 
                       <div className={`flex-1 min-h-0 w-full flex items-center justify-center relative z-30 transition-all duration-500 ${isLyricsFullScreen ? 'px-0 py-0 flex-col items-stretch justify-start' : (isVideo ? 'px-4 py-2' : 'px-8 py-2')}`}>
                         {isLyricsFullScreen && isLyricsEnabled ? (
-                          <div className="flex-1 w-full h-full flex flex-col relative overflow-hidden pointer-events-auto bg-transparent">
+                          <div className="flex-1 w-full h-full flex flex-col relative overflow-hidden bg-transparent">
                             <div className="flex-1 overflow-y-auto scrollbar-hide px-6 pt-4 pb-[30vh] flex flex-col gap-8 w-full h-full mask-edges-vertical" ref={fullLyricsContainerRef}>
                               {parsedLyrics.length === 0 && <p className="text-white/60 text-center mt-8">No lyrics available for this track.</p>}
                               {RenderedLyrics}
                             </div>
                           </div>
                         ) : isVideo && currentTrack ? (
-                          <div className="w-full aspect-video max-w-[600px] max-h-[50vh] relative bg-black shadow-[0_15px_40px_rgba(0,0,0,0.5)] rounded-[12px] overflow-hidden mx-auto pointer-events-auto">
+                          <div className="w-full aspect-video max-w-[600px] max-h-[50vh] relative bg-black shadow-[0_15px_40px_rgba(0,0,0,0.5)] rounded-[12px] overflow-hidden mx-auto">
                             <video
                               ref={videoRef}
-                              src={currentTrack.url}
                               className="w-full h-full object-contain"
                               playsInline
                               controls
@@ -961,7 +981,7 @@ jobs:
                         ) : null}
                       </div>
 
-                      <div className={`w-full px-5 pt-2 flex flex-col justify-end flex-shrink-0 transition-all duration-500 pointer-events-auto ${isLyricsFullScreen ? 'mb-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]' : 'mb-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]'}`}>
+                      <div className={`w-full px-5 pt-2 flex flex-col justify-end flex-shrink-0 transition-all duration-500 ${isLyricsFullScreen ? 'mb-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]' : 'mb-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]'}`}>
 
                         {currentTrack?.hasLyrics && parsedLyrics.length > 0 && (
                           <div className={`transition-all duration-500 w-full relative overflow-hidden flex items-center justify-start mask-edges-vertical ${isUiHidden ? 'max-h-0 opacity-0 mb-0' : (isLyricsFullScreen ? 'hidden' : 'mb-3 opacity-100 min-h-[75px]')}`}>
@@ -984,29 +1004,29 @@ jobs:
                             onChange={handleSeekChange}
                             onPointerDown={handleSeekStart} onPointerUp={handleSeekEnd}
                             onTouchStart={handleSeekStart} onTouchEnd={handleSeekEnd}
-                            className="w-full mobile-slider relative z-10 pointer-events-auto"
+                            className="w-full mobile-slider relative z-10"
                             style={{ background: `linear-gradient(to right, #fff ${progress}%, rgba(255,255,255,0.3) ${progress}%, rgba(255,255,255,0.3) ${buffered}%, rgba(255,255,255,0.1) ${buffered}%)` }} />
                           <div className="flex items-center justify-between text-[11px] font-medium text-[#a7a7a7] mt-1 w-full pointer-events-none no-select-text"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
                         </div>
 
-                        <div className={`flex flex-col w-full transition-all duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${isUiHidden ? 'max-h-0 opacity-0 translate-y-6 pointer-events-none overflow-hidden' : (isLyricsFullScreen ? 'max-h-[130px] opacity-100 translate-y-0 pointer-events-auto scale-[0.85] origin-bottom overflow-visible' : 'max-h-[160px] opacity-100 translate-y-0 pointer-events-auto overflow-visible')}`}>
+                        <div className={`flex flex-col w-full transition-all duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${isUiHidden ? 'max-h-0 opacity-0 translate-y-6 pointer-events-none overflow-hidden' : (isLyricsFullScreen ? 'max-h-[130px] opacity-100 translate-y-0 scale-[0.85] origin-bottom overflow-visible' : 'max-h-[160px] opacity-100 translate-y-0 overflow-visible')}`}>
                           <div className={`flex items-center justify-between w-full px-1 py-1.5 drop-shadow-md no-select-text ${isLyricsFullScreen ? 'mb-0' : 'mb-4'}`}>
-                            <button onClick={() => setIsShuffle(!isShuffle)} className={`active:opacity-50 pointer-events-auto ${isShuffle ? 'text-[#1db954]' : 'text-white'}`} aria-label="Shuffle"><IcShuffle size={24} /></button>
-                            <button onClick={playPrev} className="text-white active:opacity-50 pointer-events-auto" aria-label="Previous"><IcPrev size={38} /></button>
+                            <button onClick={() => setIsShuffle(!isShuffle)} className={`active:opacity-50 ${isShuffle ? 'text-[#1db954]' : 'text-white'}`} aria-label="Shuffle"><IcShuffle size={24} /></button>
+                            <button onClick={playPrev} className="text-white active:opacity-50" aria-label="Previous"><IcPrev size={38} /></button>
                             <div className="relative flex items-center justify-center">
                               {isBuffering && <div className="spotify-spinner pointer-events-none z-0" />}
                               <button onClick={togglePlayPause} aria-label={isPlaying ? "Pause" : "Play"}
-                                className="w-[64px] h-[64px] rounded-full bg-white flex items-center justify-center text-black active:scale-95 transition-transform shadow-lg relative z-10 pointer-events-auto">
+                                className="w-[64px] h-[64px] rounded-full bg-white flex items-center justify-center text-black active:scale-95 transition-transform shadow-lg relative z-10">
                                 {isPlaying ? <IcPause size={28} /> : <IcPlay size={30} className="translate-x-[1px]" />}
                               </button>
                             </div>
-                            <button onClick={playNext} className="text-white active:opacity-50 pointer-events-auto" aria-label="Next"><IcNext size={38} /></button>
-                            <button onClick={() => setRepeatMode(p => (p + 1) % 3)} className={`active:opacity-50 relative pointer-events-auto ${repeatMode > 0 ? 'text-[#1db954]' : 'text-white/70'}`} aria-label="Repeat">
+                            <button onClick={playNext} className="text-white active:opacity-50" aria-label="Next"><IcNext size={38} /></button>
+                            <button onClick={() => setRepeatMode(p => (p + 1) % 3)} className={`active:opacity-50 relative ${repeatMode > 0 ? 'text-[#1db954]' : 'text-white/70'}`} aria-label="Repeat">
                               <IcRepeat size={24} />{repeatMode === 2 && <span className="absolute -top-1 -right-1 bg-[#1db954] text-black text-[9px] font-bold rounded-full w-3 h-3 flex items-center justify-center">1</span>}
                             </button>
                           </div>
                           {!isLyricsFullScreen && (
-                            <div className="flex items-center justify-between text-[#b3b3b3] w-full px-1 drop-shadow-md pointer-events-auto mt-2">
+                            <div className="flex items-center justify-between text-[#b3b3b3] w-full px-1 drop-shadow-md mt-2">
                               <div className="flex items-center gap-4">
                                 <button onClick={() => { setShowTimerMenu(true); }} className={`active:opacity-50 transition-colors ${sleepTimer ? 'text-[#1db954]' : 'text-[#b3b3b3]'}`} aria-label="Sleep timer"><Timer size={22} /></button>
                               </div>
@@ -1019,14 +1039,14 @@ jobs:
                       </div>
                     </div>
 
-                    <div className={`w-full px-5 pb-24 flex flex-col gap-6 pointer-events-auto transition-opacity duration-500 ${isUiHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'} ${isLyricsFullScreen ? 'hidden' : 'block'}`}>
+                    <div className={`w-full px-5 pb-24 flex flex-col gap-6 transition-opacity duration-500 ${isUiHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'} ${isLyricsFullScreen ? 'hidden' : 'block'}`}>
                       {isLyricsEnabled && currentTrack?.hasLyrics && parsedLyrics.length > 0 && !isLyricsFullScreen && (
                         <div className="rounded-3xl p-6 w-full mx-auto shadow-2xl relative overflow-hidden transition-colors duration-500 border border-white/10"
                           style={{ background: `linear-gradient(165deg, ${palette.cards.lyrics[0]} 0%, ${palette.cards.lyrics[1]} 100%)` }}>
                           <div className="absolute -top-16 -right-16 w-52 h-52 rounded-full blur-[70px] pointer-events-none" style={{ backgroundColor: palette.glow }} />
                           <div className="relative z-10 flex items-center justify-between mb-6 no-select-text">
                             <h3 className="text-white font-bold text-[18px]">Lyrics</h3>
-                            <button onClick={() => setIsLyricsFullScreen(true)} className="p-2 text-white/80 hover:text-white rounded-full bg-black/30 pointer-events-auto" aria-label="Fullscreen lyrics"><IcExpand size={16} /></button>
+                            <button onClick={() => setIsLyricsFullScreen(true)} className="p-2 text-white/80 hover:text-white rounded-full bg-black/30" aria-label="Fullscreen lyrics"><IcExpand size={16} /></button>
                           </div>
                           <div className="relative z-10 flex flex-col gap-5 max-h-[300px] overflow-y-auto scrollbar-hide pb-10" ref={lyricsContainerRef}>{RenderedLyrics}</div>
                         </div>
@@ -1049,115 +1069,37 @@ jobs:
                             <StatTile icon={<Type size={17} />} label="Lyrics" value={currentTrack.hasLyrics ? "Synced" : "None"} accent="#f9a8d4" />
                             <StatTile icon={<IcQueue size={17} />} label="Type" value={isVideo ? "Video" : "Audio"} accent="#8cc2ff" />
                           </div>
-                          {currentTrack.artist && (
-                            <div className="relative z-10 text-white/70 text-[13px] font-medium">
-                              <span className="text-white/50 text-[11px] font-bold uppercase tracking-wider block mb-1">Artist</span>
-                              {currentTrack.artist}
-                            </div>
-                          )}
-                          {currentTrack.album && (
-                            <div className="relative z-10 text-white/70 text-[13px] font-medium">
-                              <span className="text-white/50 text-[11px] font-bold uppercase tracking-wider block mb-1">Album</span>
-                              {currentTrack.album}
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className={`fixed inset-0 z-[100000] bg-black/65 transition-opacity duration-300 pointer-events-auto flex flex-col justify-end ${showSettingsMenu ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowSettingsMenu(false)}>
+                <div className={`fixed inset-0 z-[100000] bg-black/65 transition-opacity duration-300 flex flex-col justify-end ${showSettingsMenu ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none invisible'}`} onClick={() => setShowSettingsMenu(false)}>
                   <div className={`w-full rounded-t-[32px] transition-transform duration-[400ms] ease-[cubic-bezier(0.32,0.72,0,1)] shadow-[0_-20px_60px_rgba(0,0,0,0.6)] border-t border-white/10 flex flex-col max-h-[90vh] overflow-hidden relative ${showSettingsMenu ? 'translate-y-0' : 'translate-y-full'}`}
                     style={{ background: `linear-gradient(180deg, ${palette.cards.queue[0]} 0%, #0c0c0e 42%)` }} onClick={e => e.stopPropagation()}>
-                    <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[120%] h-56 pointer-events-none opacity-60" style={{ background: `radial-gradient(closest-side, ${palette.glow}, transparent)` }} />
                     <div className="relative z-10 flex flex-col items-center pt-3 pb-1 flex-shrink-0"><div className="w-10 h-[5px] rounded-full bg-white/25" /></div>
                     <div className="relative z-10 flex items-center justify-between px-6 pt-3 pb-4 flex-shrink-0">
                       <h3 className="text-white font-black text-[24px] tracking-tight flex items-center gap-2.5"><Settings2 size={24} style={{ color: accent }} /> Settings</h3>
                       <button onClick={() => setShowSettingsMenu(false)} className="text-white/70 p-2 hover:text-white bg-white/10 rounded-full active:scale-90 transition-transform" aria-label="Close"><IcChevronDown size={20} /></button>
                     </div>
                     <div className="relative z-10 px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] flex flex-col gap-5 overflow-y-auto scrollbar-hide flex-1">
-                      <div className="flex items-center gap-3 p-3 rounded-3xl border border-white/10" style={{ background: `linear-gradient(120deg, ${palette.cards.lyrics[0]}, rgba(255,255,255,0.04))` }}>
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[#282828] flex-shrink-0 shadow-lg">{currentTrack && renderArt(currentTrack, "w-14 h-14", "rounded-2xl")}</div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-white/55 text-[10px] font-bold uppercase tracking-widest">Now playing · {palette.name.slice(0, 20)}</span>
-                          <span className="text-white font-extrabold text-[16px] truncate">{currentTrack?.title || currentTrack?.baseName || "—"}</span>
-                          <span className="text-white/60 text-[12.5px] font-medium truncate">{currentTrack?.artist || "Unknown Artist"}</span>
-                        </div>
-                        <EqBars playing={isPlaying} color={accent} />
-                      </div>
-
                       <div className="flex flex-col gap-2.5">
                         <span className="text-white/50 text-[11px] font-bold uppercase tracking-wider pl-2 flex items-center gap-1.5"><Type size={13} /> Lyrics &amp; word sync</span>
                         <div className="flex flex-col rounded-3xl bg-white/[0.05] border border-white/[0.07] overflow-hidden">
                           <SettingRow accent={accent} icon={<Type size={18} />} title="Show lyrics" sub="Display lyrics on player"
                             right={<Toggle accent={accent} on={isLyricsEnabled} onClick={() => { const n = !isLyricsEnabled; setIsLyricsEnabled(n); localStorage.setItem('off_lyrics_enabled', n.toString()); if (!n) setIsLyricsFullScreen(false); }} />} />
-
-                          {isLyricsEnabled && (
-                            <div className="flex flex-col gap-4 px-4 py-4 border-b border-white/[0.06] bg-black/20">
-                              <div className="flex flex-col gap-2">
-                                <span className="text-white/60 text-[12.5px] font-semibold">Mini lyrics size</span>
-                                <Segmented accent={accent} value={lineFontSize} options={SIZE_OPTIONS} onChange={(sz) => { setLineFontSize(sz); localStorage.setItem('off_line_fs', sz); }} />
-                              </div>
-                              <div className="flex flex-col gap-2">
-                                <span className="text-white/60 text-[12.5px] font-semibold">Card &amp; fullscreen size</span>
-                                <Segmented accent={accent} value={cardFontSize} options={SIZE_OPTIONS} onChange={(sz) => { setCardFontSize(sz); localStorage.setItem('off_card_fs', sz); }} />
-                              </div>
-                            </div>
-                          )}
-
                           <SettingRow accent={accent} icon={<Sparkles size={18} />} title="Word sync (card)" sub="Syncs fullscreen & card lyrics"
                             right={<Toggle accent={accent} on={isWordSyncEnabled} onClick={() => { const n = !isWordSyncEnabled; setIsWordSyncEnabled(n); localStorage.setItem('off_word_sync', n.toString()); }} />} />
                           <SettingRow last accent={accent} icon={<Sparkles size={18} />} title="Word sync (mini)" sub="Syncs the lyrics above the title"
                             right={<Toggle accent={accent} on={isMiniWordSyncEnabled} onClick={() => { const n = !isMiniWordSyncEnabled; setIsMiniWordSyncEnabled(n); localStorage.setItem('off_mini_word_sync', n.toString()); }} />} />
                         </div>
                       </div>
-
-                      {currentTrack && window.AndroidApp?.deleteDownloadedFile && (
-                        <div className="flex flex-col gap-2.5">
-                          <span className="text-white/50 text-[11px] font-bold uppercase tracking-wider pl-2 flex items-center gap-1.5">
-                            <Trash2 size={13} /> Manage
-                          </span>
-                          <button
-                            onClick={() => {
-                              const t = currentTrack;
-                              if (!t) return;
-                              if (!confirm(`Delete "${t.title || t.baseName}"?`)) return;
-                              const ok = window.AndroidApp?.deleteDownloadedFile?.(t.name);
-                              if (ok) {
-                                mediaEl()?.pause();
-                                setCurrentTrack(null);
-                                setIsPlaying(false);
-                                setIsExpanded(false);
-                                setShowSettingsMenu(false);
-                                loadFiles();
-                              }
-                            }}
-                            className="flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-300 active:scale-[0.98] transition"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-rose-500/20 text-rose-300 flex-shrink-0">
-                                <Trash2 size={18} />
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-[15px] leading-tight">Delete current track</span>
-                                <span className="text-white/45 text-[11.5px] font-medium mt-0.5 leading-snug truncate max-w-[220px]">
-                                  {currentTrack.title || currentTrack.baseName}
-                                </span>
-                              </div>
-                            </div>
-                            <X size={16} className="opacity-60 flex-shrink-0" />
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className={`fixed inset-0 z-[100005] bg-[#09090b] transition-transform duration-300 flex flex-col pointer-events-auto overflow-hidden ${showQueue ? 'translate-y-0' : 'translate-y-full'}`}>
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg, ${palette.cards.queue[0]} 0%, ${palette.cards.queue[1]} 46%, #070708 100%)` }} />
-                  <div className="absolute -top-28 left-1/2 -translate-x-1/2 w-[150%] h-[380px] pointer-events-none opacity-70" style={{ background: `radial-gradient(closest-side, ${palette.glow}, transparent)` }} />
-
+                <div className={`fixed inset-0 z-[100005] bg-[#09090b] transition-transform duration-300 flex flex-col overflow-hidden ${showQueue ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none invisible'}`}>
                   <div className="relative z-20 flex items-center justify-between px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-3 no-select-text">
                     <button onClick={() => setShowQueue(false)} className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full bg-white/10 text-white active:scale-90 transition-transform" aria-label="Close queue"><IcChevronDown size={24} /></button>
                     <div className="flex flex-col items-center min-w-0 px-3">
@@ -1166,86 +1108,26 @@ jobs:
                     </div>
                     <div className="w-10" />
                   </div>
-
                   <div className="relative z-10 flex-1 overflow-y-auto px-5 pb-[220px] no-select-text scrollbar-hide" ref={queueContainerRef}>
-                    {currentTrack && (
-                      <div className="flex items-center justify-between w-full mb-5 p-3.5 rounded-3xl border border-white/[0.12] relative overflow-hidden shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
-                        style={{ background: `linear-gradient(120deg, ${palette.cards.lyrics[0]} 0%, rgba(255,255,255,0.05) 100%)` }}>
-                        <div className="flex items-center gap-3.5 overflow-hidden relative z-10 min-w-0">
-                          <div className="w-16 h-16 flex-shrink-0 rounded-2xl overflow-hidden shadow-lg">{renderArt(currentTrack, "w-16 h-16", "rounded-2xl")}</div>
-                          <div className="flex flex-col min-w-0 pr-2 overflow-hidden">
-                            <span className="text-[10px] font-extrabold uppercase tracking-widest mb-0.5" style={{ color: accent }}>Now playing</span>
-                            <span className="text-[17px] font-extrabold text-white truncate">{currentTrack.title || currentTrack.baseName}</span>
-                            <span className="text-[13px] font-medium text-white/65 truncate">{currentTrack.artist || "Unknown Artist"}</span>
-                          </div>
-                        </div>
-                        <div className="relative z-10 pr-1 flex-shrink-0"><EqBars playing={isPlaying} color={accent} /></div>
-                        <div className="absolute bottom-0 left-0 h-[3px] w-full bg-white/10"><div className="h-full" style={{ width: `${progress}%`, background: `linear-gradient(to right, ${accent}, ${palette.light})` }} /></div>
-                      </div>
-                    )}
-
-                    {filteredTracks.length > 0 && (
-                      <div className="grid grid-cols-3 gap-2.5 mb-6">
-                        {[
-                          { v: String(filteredTracks.length), l: "Tracks" },
-                          { v: String(filteredTracks.filter(t => !t.isVideo).length), l: "Audio" },
-                          { v: String(filteredTracks.filter(t => t.isVideo).length), l: "Video" },
-                        ].map((s, i) => (
-                          <div key={i} className="flex flex-col gap-0.5 p-3 rounded-2xl border border-white/[0.08]" style={{ background: `linear-gradient(145deg, ${palette.cards.stats[0]}, ${palette.cards.stats[1]})` }}>
-                            <span className="text-white font-extrabold text-[18px] tracking-tight leading-tight truncate">{s.v}</span>
-                            <span className="text-white/55 text-[11px] font-semibold">{s.l}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[17px] font-extrabold text-white">On this device</span>
-                      <span className="text-[12px] font-semibold text-white/45">{filteredTracks.length} songs</span>
-                    </div>
-                    {filteredTracks.length === 0 && <p className="text-white/45 text-[14px] font-medium py-8 text-center">Nothing queued.</p>}
-                    <div className="flex flex-col relative">
-                      {filteredTracks.map((track, i) => {
-                        const isCurrent = currentTrack?.name === track.name;
-                        return (
-                          <div key={track.name + i}
-                            onClick={() => { playTrack(track, true); setShowQueue(false); }}
-                            className={`queue-item flex items-center justify-between w-full group h-[60px] p-2 rounded-xl cursor-pointer relative ${isCurrent ? 'bg-white/[0.1]' : 'bg-transparent hover:bg-white/[0.06]'}`}>
-                            <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-                              <div className="w-[44px] h-[44px] flex-shrink-0 rounded-[8px] overflow-hidden shadow-md">{renderArt(track, "w-[44px] h-[44px]", "rounded-[8px]")}</div>
-                              <div className="flex flex-col min-w-0 pr-2 overflow-hidden">
-                                <span className={`text-[15px] font-bold truncate ${isCurrent ? 'text-emerald-300' : 'text-white'}`}>{track.title || track.baseName}</span>
-                                <span className="text-[13px] font-medium text-white/60 truncate">{track.artist || "Unknown Artist"}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center flex-shrink-0 pr-2">
-                              {isCurrent ? <EqBars playing={isPlaying} color={accent} /> : <span className="text-[11px] font-semibold text-white/35 uppercase">{track.ext}</span>}
+                    {filteredTracks.map((track, i) => {
+                      const isCurrent = currentTrack?.name === track.name;
+                      return (
+                        <div key={track.name + i}
+                          onClick={() => { playTrack(track, true); setShowQueue(false); }}
+                          className={`queue-item flex items-center justify-between w-full group h-[60px] p-2 rounded-xl cursor-pointer relative ${isCurrent ? 'bg-white/[0.1]' : 'bg-transparent hover:bg-white/[0.06]'}`}>
+                          <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+                            <div className="w-[44px] h-[44px] flex-shrink-0 rounded-[8px] overflow-hidden shadow-md">{renderArt(track, "w-[44px] h-[44px]", "rounded-[8px]")}</div>
+                            <div className="flex flex-col min-w-0 pr-2 overflow-hidden">
+                              <span className={`text-[15px] font-bold truncate ${isCurrent ? 'text-emerald-300' : 'text-white'}`}>{track.title || track.baseName}</span>
+                              <span className="text-[13px] font-medium text-white/60 truncate">{track.artist || "Unknown Artist"}</span>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-[35px] left-0 w-full z-20 px-5 pb-0 pt-3 no-select-text pointer-events-none">
-                    <div className="pointer-events-auto rounded-[28px] border border-white/[0.12] bg-black/55 backdrop-blur-2xl px-5 py-3 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-                      <div className="flex flex-col items-center gap-1 active:opacity-50 cursor-pointer min-w-[56px]" onClick={() => setIsShuffle(!isShuffle)}>
-                        <IcShuffle size={22} className={isShuffle ? '' : 'text-white/70'} />
-                        <span className="text-[11px] font-semibold" style={{ color: isShuffle ? accent : 'rgba(255,255,255,0.7)' }}>Shuffle</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1 active:opacity-50 cursor-pointer min-w-[56px]" onClick={() => setRepeatMode(p => (p + 1) % 3)}>
-                        <div className="relative" style={{ color: repeatMode > 0 ? accent : 'rgba(255,255,255,0.7)' }}>
-                          <IcRepeat size={22} />{repeatMode === 2 && <span className="absolute -top-1 -right-1 text-black text-[9px] font-bold rounded-full w-3 h-3 flex items-center justify-center" style={{ background: accent }}>1</span>}
+                          <div className="flex items-center flex-shrink-0 pr-2">
+                            {isCurrent ? <EqBars playing={isPlaying} color={accent} /> : <span className="text-[11px] font-semibold text-white/35 uppercase">{track.ext}</span>}
+                          </div>
                         </div>
-                        <span className="text-[11px] font-semibold" style={{ color: repeatMode > 0 ? accent : 'rgba(255,255,255,0.7)' }}>Repeat</span>
-                      </div>
-                      <div className="flex flex-col items-center gap-1 active:opacity-50 cursor-pointer min-w-[56px]" onClick={() => setShowTimerMenu(true)}>
-                        <div style={{ color: sleepTimer ? accent : 'rgba(255,255,255,0.7)' }}><Timer size={22} /></div>
-                        <span className="text-[11px] font-semibold" style={{ color: sleepTimer ? accent : 'rgba(255,255,255,0.7)' }}>
-                          {timerRemaining ? formatTime(timerRemaining) : sleepTimer === 'end' ? 'End' : 'Timer'}
-                        </span>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1260,10 +1142,6 @@ jobs:
                           <span className="font-medium">{mins} minutes</span>{sleepTimer === mins && <Check size={18} />}
                         </button>
                       ))}
-                      <button onClick={() => { setSleepTimer('end'); setShowTimerMenu(false); }}
-                        className={`py-3 px-4 rounded-xl flex justify-between items-center transition-colors ${sleepTimer === 'end' ? 'bg-[#1db954]/20 text-[#1db954]' : 'bg-white/5 text-white hover:bg-white/10'}`}>
-                        <span className="font-medium">End of track</span>{sleepTimer === 'end' && <Check size={18} />}
-                      </button>
                       <button onClick={() => { setSleepTimer(null); setShowTimerMenu(false); }} className="py-3 px-4 rounded-xl text-white/50 hover:bg-white/5 text-left mt-2 border border-white/10 transition-colors">Turn off timer</button>
                     </div>
                   </div>
@@ -1273,14 +1151,9 @@ jobs:
           }
           EOF
 
-          # 2. Try fetching latest down.txt at build time; if reachable & non-empty, use it as initial baseline
-          curl -fsSL https://ayushmobileappmusicgaaana.vercel.app/down.txt -o src/remote_down.tsx || true
-          if [ -s src/remote_down.tsx ] && grep -q "OfflinePlayer" src/remote_down.tsx; then
-            cp src/remote_down.tsx src/OfflinePlayer.tsx
-          fi
           cp src/OfflinePlayer.tsx www/initial_down.tsx
 
-          # 3. Create entry wrapper that supports both pre-compiled OfflinePlayer AND hot-swapped TSX from /down.txt
+          # 2. Entry wrapper that hot-patches any remote down.txt code so it also uses the fixed media/art pipeline
           cat <<'EOF' > src/entry.tsx
           import React, { useState, useEffect } from "react";
           import { createRoot } from "react-dom/client";
@@ -1289,12 +1162,25 @@ jobs:
           // @ts-ignore
           import * as Babel from "@babel/standalone";
 
-          (window as any).__React = React;
-          (window as any).__LucideIcons = LucideIcons;
+          function patchRemoteTsxSource(raw: string): string {
+            return raw
+              .replace(/^\s*["']use client["'];?\s*/m, "")
+              // Fix duplicate hidden videoRef conflict in remote down.txt
+              .replace(/\{isVideo\s*&&\s*\(\s*<video[\s\S]*?className="hidden"\s*\/>\s*\)\}/g, "")
+              // Fix off-screen pointer-events overlay interception when !isExpanded
+              .replace(
+                'translate-y-full opacity-0 pointer-events-none"',
+                'translate-y-full opacity-0 pointer-events-none invisible"'
+              )
+              .replace(
+                'w-full flex flex-col flex-shrink-0 pointer-events-auto transition-all duration-500',
+                'w-full flex flex-col flex-shrink-0 transition-all duration-500'
+              );
+          }
 
           function compileRemoteTsx(tsxCode: string): React.ComponentType | null {
             try {
-              const cleaned = tsxCode.replace(/^\s*["']use client["'];?\s*/m, "");
+              const cleaned = patchRemoteTsxSource(tsxCode);
               const transformed = Babel.transform(cleaned, {
                 filename: "down.tsx",
                 presets: [
@@ -1355,7 +1241,7 @@ jobs:
           }
           EOF
 
-          # 4. Generate Tailwind CSS for all classes used in OfflinePlayer
+          # 3. Build Tailwind CSS
           cat <<'EOF' > tailwind.config.js
           module.exports = {
             content: ["./src/**/*.{ts,tsx,js,jsx}"],
@@ -1370,10 +1256,10 @@ jobs:
           EOF
           npx tailwindcss -i ./src/input.css -o ./www/offline-tailwind.css --minify
 
-          # 5. Bundle React + Lucide + Babel + Initial OfflinePlayer into a single offline JS bundle
+          # 4. Bundle React + Lucide + Babel + OfflinePlayer
           npx esbuild src/entry.tsx --bundle --minify --format=iife --target=es2020 --outfile=www/offline-bundle.js
 
-          # 6. Create www/index.html & www/error.html
+          # 5. Create www/index.html & www/error.html
           cat <<'EOF' > www/index.html
           <!DOCTYPE html>
           <html lang="en">
@@ -1433,7 +1319,7 @@ jobs:
       - name: Add Native Android Platform
         run: npx cap add android
 
-      - name: Inject Permissions & Root Folder Access Meta-Data
+      - name: Inject Permissions & Cleartext Localhost Support
         run: |
           node -e "
           const fs = require('fs');
@@ -1485,7 +1371,7 @@ jobs:
           }
           "
 
-      - name: Inject MainActivity with Background down.txt Sync (3h + Online Event) & ID3 Server
+      - name: Inject MainActivity with Native Loopback HTTP Media Server (127.0.0.1:48481) + Background down.txt Sync
         run: |
           cat <<'EOF' > android/app/src/main/java/com/music8481/app/MainActivity.java
           package com.music8481.app;
@@ -1547,6 +1433,7 @@ jobs:
           import org.json.JSONArray;
           import org.json.JSONObject;
 
+          import java.io.BufferedReader;
           import java.io.ByteArrayInputStream;
           import java.io.ByteArrayOutputStream;
           import java.io.File;
@@ -1554,8 +1441,13 @@ jobs:
           import java.io.FileOutputStream;
           import java.io.IOException;
           import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.io.OutputStream;
           import java.io.RandomAccessFile;
           import java.net.HttpURLConnection;
+          import java.net.InetAddress;
+          import java.net.ServerSocket;
+          import java.net.Socket;
           import java.net.URL;
           import java.net.URLDecoder;
           import java.net.URLEncoder;
@@ -1567,6 +1459,7 @@ jobs:
           import java.util.List;
           import java.util.Map;
           import java.util.concurrent.ConcurrentHashMap;
+          import java.util.concurrent.ExecutorService;
           import java.util.concurrent.Executors;
           import java.util.concurrent.ScheduledExecutorService;
           import java.util.concurrent.TimeUnit;
@@ -1580,6 +1473,11 @@ jobs:
               private String pendingDownloadFilename = null;
               private boolean initialRouteHandled = false;
 
+              private static final int LOCAL_PORT = 48481;
+              private static final String LOCAL_SERVER_BASE = "http://127.0.0.1:" + LOCAL_PORT;
+              private ServerSocket localServerSocket;
+              private final ExecutorService httpThreadPool = Executors.newCachedThreadPool();
+
               private static final String DOWN_TXT_URL = "https://ayushmobileappmusicgaaana.vercel.app/down.txt";
               private static final String PREFS_NAME = "Music8481Prefs";
               private static final String KEY_DOWN_HASH = "cached_down_txt_sha256";
@@ -1591,6 +1489,18 @@ jobs:
               private final AtomicBoolean isSyncingDownTxt = new AtomicBoolean(false);
               private ConnectivityManager.NetworkCallback networkCallback;
 
+              // Fast in-memory ID3 metadata & cover art cache so 4s polling never blocks UI or drops images
+              private static class CachedMeta {
+                  long lastModified;
+                  long size;
+                  String title;
+                  String artist;
+                  String album;
+                  boolean hasArt;
+                  byte[] artBytes;
+              }
+              private final ConcurrentHashMap<String, CachedMeta> id3Cache = new ConcurrentHashMap<>();
+
               private static final String CHANNEL_ID = "music8481_download_channel";
               private static final String ACTION_PAUSE = "com.music8481.app.ACTION_PAUSE";
               private static final String ACTION_RESUME = "com.music8481.app.ACTION_RESUME";
@@ -1601,10 +1511,208 @@ jobs:
               private final ConcurrentHashMap<Integer, DownloadTask> activeTasks = new ConcurrentHashMap<>();
 
               // =========================================================================
+              // 🔥 NATIVE LOOPBACK HTTP SERVER (http://127.0.0.1:48481)
+              //    Android WebView's native <audio>/<video> player requires a real socket
+              //    with HTTP 206 Range support & CORS headers to play local files reliably
+              //    both online (on https://...vercel.app/download) and offline!
+              // =========================================================================
+              private void startLocalMediaHttpServer() {
+                  new Thread(() -> {
+                      try {
+                          localServerSocket = new ServerSocket(LOCAL_PORT, 50, InetAddress.getByName("127.0.0.1"));
+                          while (!localServerSocket.isClosed()) {
+                              final Socket client = localServerSocket.accept();
+                              httpThreadPool.execute(() -> handleLocalHttpClient(client));
+                          }
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                      }
+                  }).start();
+              }
+
+              private void handleLocalHttpClient(Socket client) {
+                  try (Socket sock = client;
+                       InputStream in = sock.getInputStream();
+                       OutputStream out = sock.getOutputStream();
+                       BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+
+                      sock.setSoTimeout(15000);
+                      String requestLine = reader.readLine();
+                      if (requestLine == null || requestLine.isEmpty()) return;
+
+                      String[] parts = requestLine.split(" ");
+                      if (parts.length < 2) return;
+                      String method = parts[0].toUpperCase();
+                      String rawUri = parts[1];
+
+                      String rangeHeader = null;
+                      String line;
+                      while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                          if (line.toLowerCase().startsWith("range:")) {
+                              rangeHeader = line.substring(6).trim();
+                          }
+                      }
+
+                      if ("OPTIONS".equals(method)) {
+                          String resp = "HTTP/1.1 204 No Content\r\n" +
+                                  "Access-Control-Allow-Origin: *\r\n" +
+                                  "Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n" +
+                                  "Access-Control-Allow-Headers: *\r\n" +
+                                  "Access-Control-Max-Age: 86400\r\n\r\n";
+                          out.write(resp.getBytes(StandardCharsets.UTF_8));
+                          out.flush();
+                          return;
+                      }
+
+                      int qIdx = rawUri.indexOf('?');
+                      String pathOnly = qIdx >= 0 ? rawUri.substring(0, qIdx) : rawUri;
+
+                      if (pathOnly.startsWith("/art/")) {
+                          String fileName = URLDecoder.decode(pathOnly.substring(5), "UTF-8");
+                          File mediaFile = findLocalMediaFile(fileName);
+                          if (mediaFile != null && mediaFile.exists()) {
+                              CachedMeta meta = getOrExtractMeta(mediaFile);
+                              if (meta.artBytes != null && meta.artBytes.length > 0) {
+                                  String headers = "HTTP/1.1 200 OK\r\n" +
+                                          "Content-Type: image/jpeg\r\n" +
+                                          "Content-Length: " + meta.artBytes.length + "\r\n" +
+                                          "Access-Control-Allow-Origin: *\r\n" +
+                                          "Cache-Control: max-age=86400\r\n" +
+                                          "Connection: close\r\n\r\n";
+                                  out.write(headers.getBytes(StandardCharsets.UTF_8));
+                                  if (!"HEAD".equals(method)) {
+                                      out.write(meta.artBytes);
+                                  }
+                                  out.flush();
+                                  return;
+                              }
+                          }
+                          out.write("HTTP/1.1 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                          out.flush();
+                          return;
+                      }
+
+                      if (pathOnly.startsWith("/media/")) {
+                          String fileName = URLDecoder.decode(pathOnly.substring(7), "UTF-8");
+                          File file = findLocalMediaFile(fileName);
+                          if (file != null && file.exists()) {
+                              String mime = getMimeForFile(fileName);
+                              long fileLen = file.length();
+                              long start = 0;
+                              long end = fileLen - 1;
+                              boolean isPartial = false;
+
+                              if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                                  isPartial = true;
+                                  String[] rParts = rangeHeader.substring(6).split("-");
+                                  try {
+                                      if (!rParts[0].isEmpty()) start = Long.parseLong(rParts[0]);
+                                      if (rParts.length > 1 && !rParts[1].isEmpty()) end = Long.parseLong(rParts[1]);
+                                  } catch (Exception ignored) {}
+                                  if (end >= fileLen) end = fileLen - 1;
+                                  if (start > end || start < 0) start = 0;
+                              }
+
+                              long contentLen = end - start + 1;
+                              StringBuilder hdr = new StringBuilder();
+                              hdr.append(isPartial ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n");
+                              hdr.append("Content-Type: ").append(mime).append("\r\n");
+                              hdr.append("Accept-Ranges: bytes\r\n");
+                              hdr.append("Access-Control-Allow-Origin: *\r\n");
+                              hdr.append("Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n");
+                              hdr.append("Access-Control-Allow-Headers: *\r\n");
+                              if (isPartial) {
+                                  hdr.append("Content-Range: bytes ").append(start).append("-").append(end).append("/").append(fileLen).append("\r\n");
+                              }
+                              hdr.append("Content-Length: ").append(contentLen).append("\r\n");
+                              hdr.append("Connection: close\r\n\r\n");
+
+                              out.write(hdr.toString().getBytes(StandardCharsets.UTF_8));
+
+                              if (!"HEAD".equals(method)) {
+                                  try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                                      raf.seek(start);
+                                      byte[] buf = new byte[32768];
+                                      long rem = contentLen;
+                                      while (rem > 0) {
+                                          int toRead = (int) Math.min(buf.length, rem);
+                                          int r = raf.read(buf, 0, toRead);
+                                          if (r <= 0) break;
+                                          out.write(buf, 0, r);
+                                          rem -= r;
+                                      }
+                                  }
+                              }
+                              out.flush();
+                              return;
+                          }
+                      }
+
+                      out.write("HTTP/1.1 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+                      out.flush();
+                  } catch (Exception ignored) {}
+              }
+
+              private String getMimeForFile(String fileName) {
+                  String lower = fileName.toLowerCase();
+                  if (lower.endsWith(".mp4")) return "video/mp4";
+                  if (lower.endsWith(".webm")) return "video/webm";
+                  if (lower.endsWith(".m4a")) return "audio/mp4";
+                  if (lower.endsWith(".wav")) return "audio/wav";
+                  if (lower.endsWith(".ogg")) return "audio/ogg";
+                  if (lower.endsWith(".lrc")) return "text/plain; charset=utf-8";
+                  return "audio/mpeg";
+              }
+
+              private CachedMeta getOrExtractMeta(File f) {
+                  String key = f.getAbsolutePath();
+                  CachedMeta existing = id3Cache.get(key);
+                  if (existing != null && existing.lastModified == f.lastModified() && existing.size == f.length()) {
+                      return existing;
+                  }
+
+                  String name = f.getName();
+                  int dotIdx = name.lastIndexOf('.');
+                  String baseName = dotIdx > 0 ? name.substring(0, dotIdx).trim() : name;
+
+                  CachedMeta meta = new CachedMeta();
+                  meta.lastModified = f.lastModified();
+                  meta.size = f.length();
+                  meta.title = baseName;
+                  meta.artist = "Unknown Artist";
+                  meta.album = "";
+                  meta.hasArt = false;
+                  meta.artBytes = null;
+
+                  MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                  try {
+                      mmr.setDataSource(f.getAbsolutePath());
+                      String id3Title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+                      String id3Artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+                      if (id3Artist == null || id3Artist.trim().isEmpty()) {
+                          id3Artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
+                      }
+                      String id3Album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+                      byte[] art = mmr.getEmbeddedPicture();
+
+                      if (id3Title != null && !id3Title.trim().isEmpty()) meta.title = id3Title.trim();
+                      if (id3Artist != null && !id3Artist.trim().isEmpty()) meta.artist = id3Artist.trim();
+                      if (id3Album != null && !id3Album.trim().isEmpty()) meta.album = id3Album.trim();
+                      if (art != null && art.length > 0) {
+                          meta.hasArt = true;
+                          meta.artBytes = art;
+                      }
+                  } catch (Exception ignored) {
+                  } finally {
+                      try { mmr.release(); } catch (Exception ignored) {}
+                  }
+
+                  id3Cache.put(key, meta);
+                  return meta;
+              }
+
+              // =========================================================================
               // 🔥 BACKGROUND SYNC FOR https://ayushmobileappmusicgaaana.vercel.app/down.txt
-              //    - Initial load in background when app opens
-              //    - Checks every 3 hours OR when network comes online
-              //    - Compares SHA-256 hash; updates cached TSX only if changed
               // =========================================================================
               private File getCachedDownTsxFile() {
                   return new File(getFilesDir(), CACHED_TSX_FILENAME);
@@ -1714,7 +1822,6 @@ jobs:
               private void startDownTxtBackgroundSchedule() {
                   ensureInitialSeedTsx();
 
-                  // Check every 3 hours while app process is alive (initial check runs immediately)
                   syncScheduler.scheduleWithFixedDelay(
                       () -> syncDownTxtInBackground(true),
                       0L,
@@ -1722,7 +1829,6 @@ jobs:
                       TimeUnit.HOURS
                   );
 
-                  // Also trigger check whenever device comes online
                   ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
                   if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                       networkCallback = new ConnectivityManager.NetworkCallback() {
@@ -2177,6 +2283,10 @@ jobs:
                       syncDownTxtInBackground(true);
                   }
 
+                  // =========================================================================
+                  // 🔥 SCAN /Music8481/Download + SERVE VIA http://127.0.0.1:48481
+                  //    Works identically on both https://...vercel.app/download AND offline!
+                  // =========================================================================
                   @JavascriptInterface
                   public String getDownloadedFiles() {
                       JSONArray result = new JSONArray();
@@ -2219,36 +2329,15 @@ jobs:
                                   obj.put("isVideo", ext.equals("mp4") || ext.equals("webm"));
 
                                   String encoded = URLEncoder.encode(name, "UTF-8").replace("+", "%20");
-                                  obj.put("url", "https://localmedia.music8481.app/" + encoded);
+                                  // Use real loopback HTTP socket so <audio>/<video> & <img> work online and offline!
+                                  obj.put("url", LOCAL_SERVER_BASE + "/media/" + encoded);
 
-                                  String id3Title = null;
-                                  String id3Artist = null;
-                                  String id3Album = null;
-                                  boolean hasArt = false;
-
-                                  MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                                  try {
-                                      mmr.setDataSource(f.getAbsolutePath());
-                                      id3Title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-                                      id3Artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-                                      if (id3Artist == null || id3Artist.trim().isEmpty()) {
-                                          id3Artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
-                                      }
-                                      id3Album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
-                                      byte[] artBytes = mmr.getEmbeddedPicture();
-                                      if (artBytes != null && artBytes.length > 0) {
-                                          hasArt = true;
-                                      }
-                                  } catch (Exception ignored) {
-                                  } finally {
-                                      try { mmr.release(); } catch (Exception ignored) {}
-                                  }
-
-                                  obj.put("title", (id3Title != null && !id3Title.trim().isEmpty()) ? id3Title.trim() : baseName);
-                                  obj.put("artist", (id3Artist != null && !id3Artist.trim().isEmpty()) ? id3Artist.trim() : "Unknown Artist");
-                                  obj.put("album", (id3Album != null && !id3Album.trim().isEmpty()) ? id3Album.trim() : "");
-                                  obj.put("hasArt", hasArt);
-                                  obj.put("artUrl", hasArt ? ("https://localmedia.music8481.app/__art__/" + encoded) : "");
+                                  CachedMeta meta = getOrExtractMeta(f);
+                                  obj.put("title", meta.title);
+                                  obj.put("artist", meta.artist);
+                                  obj.put("album", meta.album);
+                                  obj.put("hasArt", meta.hasArt);
+                                  obj.put("artUrl", meta.hasArt ? (LOCAL_SERVER_BASE + "/art/" + encoded) : "");
 
                                   File matchingLrc = lrcMap.get(baseName.toLowerCase());
                                   if (matchingLrc != null && matchingLrc.exists()) {
@@ -2274,6 +2363,7 @@ jobs:
                       try {
                           File f = findLocalMediaFile(fileName);
                           if (f != null && f.exists()) {
+                              id3Cache.remove(f.getAbsolutePath());
                               int dot = fileName.lastIndexOf('.');
                               if (dot > 0) {
                                   String base = fileName.substring(0, dot);
@@ -2376,6 +2466,9 @@ jobs:
                   requestAllPermissions();
                   getMusic8481Directory();
 
+                  // Start local loopback HTTP server on 127.0.0.1:48481 for <audio>/<video> & cover art
+                  startLocalMediaHttpServer();
+
                   // Start background 3-hour & on-online sync for /down.txt
                   startDownTxtBackgroundSchedule();
 
@@ -2408,6 +2501,8 @@ jobs:
                       settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                       settings.setAllowFileAccess(true);
                       settings.setAllowContentAccess(true);
+                      settings.setAllowFileAccessFromFileURLs(true);
+                      settings.setAllowUniversalAccessFromFileURLs(true);
                       settings.setJavaScriptCanOpenWindowsAutomatically(true);
                       
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -2439,6 +2534,13 @@ jobs:
                           public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                               Uri uri = request.getUrl();
                               if (uri != null && "localmedia.music8481.app".equalsIgnoreCase(uri.getHost())) {
+                                  if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+                                      Map<String, String> corsHeaders = new HashMap<>();
+                                      corsHeaders.put("Access-Control-Allow-Origin", "*");
+                                      corsHeaders.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                                      corsHeaders.put("Access-Control-Allow-Headers", "*");
+                                      return new WebResourceResponse("text/plain", "UTF-8", 204, "No Content", corsHeaders, new ByteArrayInputStream(new byte[0]));
+                                  }
                                   try {
                                       String rawPath = uri.getPath();
                                       if (rawPath != null && rawPath.startsWith("/")) rawPath = rawPath.substring(1);
@@ -2447,25 +2549,20 @@ jobs:
                                           String artFileName = URLDecoder.decode(rawPath.substring(8), "UTF-8");
                                           File mediaFile = findLocalMediaFile(artFileName);
                                           if (mediaFile != null && mediaFile.exists()) {
-                                              MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                                              try {
-                                                  mmr.setDataSource(mediaFile.getAbsolutePath());
-                                                  byte[] artBytes = mmr.getEmbeddedPicture();
-                                                  if (artBytes != null && artBytes.length > 0) {
-                                                      Map<String, String> headers = new HashMap<>();
-                                                      headers.put("Access-Control-Allow-Origin", "*");
-                                                      headers.put("Cache-Control", "max-age=86400");
-                                                      return new WebResourceResponse(
-                                                              "image/jpeg",
-                                                              "UTF-8",
-                                                              200,
-                                                              "OK",
-                                                              headers,
-                                                              new ByteArrayInputStream(artBytes)
-                                                      );
-                                                  }
-                                              } finally {
-                                                  try { mmr.release(); } catch (Exception ignored) {}
+                                              CachedMeta meta = getOrExtractMeta(mediaFile);
+                                              if (meta.artBytes != null && meta.artBytes.length > 0) {
+                                                  Map<String, String> headers = new HashMap<>();
+                                                  headers.put("Access-Control-Allow-Origin", "*");
+                                                  headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                                                  headers.put("Cache-Control", "max-age=86400");
+                                                  return new WebResourceResponse(
+                                                          "image/jpeg",
+                                                          "UTF-8",
+                                                          200,
+                                                          "OK",
+                                                          headers,
+                                                          new ByteArrayInputStream(meta.artBytes)
+                                                  );
                                               }
                                           }
                                           return new WebResourceResponse("image/png", "UTF-8", 404, "Not Found", null, null);
@@ -2475,19 +2572,13 @@ jobs:
                                       File file = findLocalMediaFile(fileName);
 
                                       if (file != null && file.exists()) {
-                                          String lower = fileName.toLowerCase();
-                                          String mime = "audio/mpeg";
-                                          if (lower.endsWith(".mp4")) mime = "video/mp4";
-                                          else if (lower.endsWith(".webm")) mime = "video/webm";
-                                          else if (lower.endsWith(".m4a")) mime = "audio/mp4";
-                                          else if (lower.endsWith(".wav")) mime = "audio/wav";
-                                          else if (lower.endsWith(".lrc")) mime = "text/plain";
-
+                                          String mime = getMimeForFile(fileName);
                                           long fileLen = file.length();
                                           String rangeHeader = request.getRequestHeaders() != null ? request.getRequestHeaders().get("Range") : null;
 
                                           Map<String, String> headers = new HashMap<>();
                                           headers.put("Access-Control-Allow-Origin", "*");
+                                          headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
                                           headers.put("Accept-Ranges", "bytes");
 
                                           if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
@@ -2528,7 +2619,6 @@ jobs:
                           }
                       });
 
-                      // Open app normally when online; serve local offline download vault when offline
                       if (!initialRouteHandled) {
                           initialRouteHandled = true;
                           if (!isNetworkOnline()) {
@@ -2566,19 +2656,38 @@ jobs:
                           }
                       });
                       
+                      // Runtime script that also fixes the live online /download page on Vercel automatically!
                       webView.postDelayed(() -> {
                           String boostScript =
                               "(function() {" +
                               "  if (window.__music8481Injected) return;" +
                               "  window.__music8481Injected = true;" +
                               "  " +
-                              "  var OrigAudio = window.Audio;" +
-                              "  window.Audio = function(src) {" +
-                              "    var a = new OrigAudio(src);" +
-                              "    a.preload = 'auto';" +
-                              "    return a;" +
-                              "  };" +
-                              "  window.Audio.prototype = OrigAudio.prototype;" +
+                              "  function rewriteUrl(u) {" +
+                              "    if (typeof u !== 'string') return u;" +
+                              "    if (u.indexOf('https://localmedia.music8481.app/__art__/') === 0) {" +
+                              "      return u.replace('https://localmedia.music8481.app/__art__/', 'http://127.0.0.1:48481/art/');" +
+                              "    }" +
+                              "    if (u.indexOf('https://localmedia.music8481.app/') === 0) {" +
+                              "      return u.replace('https://localmedia.music8481.app/', 'http://127.0.0.1:48481/media/');" +
+                              "    }" +
+                              "    return u;" +
+                              "  }" +
+                              "  " +
+                              "  var origSrcDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');" +
+                              "  if (origSrcDesc && origSrcDesc.set) {" +
+                              "    Object.defineProperty(HTMLMediaElement.prototype, 'src', {" +
+                              "      get: function() { return origSrcDesc.get.call(this); }," +
+                              "      set: function(v) { origSrcDesc.set.call(this, rewriteUrl(v)); }" +
+                              "    });" +
+                              "  }" +
+                              "  var origImgSrcDesc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');" +
+                              "  if (origImgSrcDesc && origImgSrcDesc.set) {" +
+                              "    Object.defineProperty(HTMLImageElement.prototype, 'src', {" +
+                              "      get: function() { return origImgSrcDesc.get.call(this); }," +
+                              "      set: function(v) { origImgSrcDesc.set.call(this, rewriteUrl(v)); }" +
+                              "    });" +
+                              "  }" +
                               "  " +
                               "  window.__streamBlobToNative = function(blobUrl, fileName, fallbackMime) {" +
                               "    fetch(blobUrl).then(function(r) { return r.blob(); }).then(function(blob) {" +
@@ -2645,26 +2754,33 @@ jobs:
                               "  };" +
                               "  " +
                               "  setInterval(function() {" +
-                              "    var meta = document.querySelector('meta[name=\"viewport\"]');" +
-                              "    var content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
-                              "    if (meta && meta.content !== content) meta.content = content;" +
-                              "    document.documentElement.style.padding = '0';" +
-                              "    document.documentElement.style.margin = '0';" +
-                              "    document.body.style.padding = '0';" +
-                              "    document.body.style.margin = '0';" +
-                              "    " +
-                              "    var medias = document.querySelectorAll('audio, video');" +
-                              "    for (var i = 0; i < medias.length; i++) {" +
-                              "      if (medias[i].preload !== 'auto') medias[i].preload = 'auto';" +
-                              "      medias[i].style.transform = 'translateZ(0)';" +
+                              "    // Fix online /download page pointer-events overlay bug if collapsed player is blocking clicks" +
+                              "    var pr = document.querySelector('.player-root.translate-y-full');" +
+                              "    if (pr) {" +
+                              "      pr.style.pointerEvents = 'none';" +
+                              "      pr.style.visibility = 'hidden';" +
+                              "      var child = pr.querySelector('.pointer-events-auto');" +
+                              "      if (child) child.style.pointerEvents = 'none';" +
+                              "    } else {" +
+                              "      var prOpen = document.querySelector('.player-root.translate-y-0');" +
+                              "      if (prOpen) {" +
+                              "        prOpen.style.pointerEvents = 'auto';" +
+                              "        prOpen.style.visibility = 'visible';" +
+                              "        var childOpen = prOpen.querySelector('.pointer-events-auto');" +
+                              "        if (childOpen) childOpen.style.pointerEvents = 'auto';" +
+                              "      }" +
                               "    }" +
-                              "    " +
+                              "    // Remove duplicate hidden <video> element if online /download page rendered two video refs" +
+                              "    var hiddenVids = document.querySelectorAll('video.hidden');" +
+                              "    if (hiddenVids.length > 0 && document.querySelector('.player-root video:not(.hidden)')) {" +
+                              "      hiddenVids.forEach(function(v) { v.remove(); });" +
+                              "    }" +
                               "    var iframe = document.querySelector('iframe[src*=\"ayushcom.vercel.app\"]');" +
                               "    if (window.AndroidApp) window.AndroidApp.setVideoMode(iframe !== null);" +
-                              "  }, 500);" +
+                              "  }, 350);" +
                               "})();";
                           webView.evaluateJavascript(boostScript, null);
-                      }, 1000);
+                      }, 600);
 
                       final WebChromeClient originalClient = webView.getWebChromeClient();
                       webView.setWebChromeClient(new WebChromeClient() {
@@ -2786,6 +2902,8 @@ jobs:
               public void onDestroy() {
                   super.onDestroy();
                   try { unregisterReceiver(downloadReceiver); } catch (Exception ignored) {}
+                  try { if (localServerSocket != null) localServerSocket.close(); } catch (Exception ignored) {}
+                  httpThreadPool.shutdownNow();
                   try {
                       ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
                       if (cm != null && networkCallback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
