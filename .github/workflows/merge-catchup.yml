@@ -5,8 +5,8 @@ on:
 
 jobs:
   build-apk:
-    runs-on: ubuntu-22.04 
-    
+    runs-on: ubuntu-22.04
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
           <body></body>
           </html>
           EOF
-          
+
           cat <<'EOF' > www/error.html
           <!DOCTYPE html>
           <html lang="en">
@@ -56,15 +56,15 @@ jobs:
           <style>
           :root {
           --bg:#07070b; --hx:#1ed760; --hx2:#8b5cf6; --hx3:#22d3ee; --surf:rgba(255,255,255,.055); --line:rgba(255,255,255,.09); --txt2:#9ca3af;
-          --base:#3a3a3a; --deep:#1b1b1b; --accent:#c9c9c9; --light:#e8e8e8; --glow:rgba(255,255,255,.18);
-          --active:#fff; --past:rgba(255,255,255,.36); --upcoming:#dcdcdc;
-          --c-lyr-a:#3a3a3a; --c-lyr-b:#1b1b1b; --c-about-a:#2e2e2e; --c-about-b:#141414;
-          --c-q-a:#2a2a2a; --c-q-b:#0b0b0b; --c-st-a:#444; --c-st-b:#262626;
+          --base:#2c2c2c; --deep:#161616; --accent:#a8a8a8; --light:#bdbdbd; --glow:rgba(255,255,255,.14);
+          --active:#fff; --past:rgba(255,255,255,.36); --upcoming:#c4c4c4;
+          --c-lyr-a:#2c2c2c; --c-lyr-b:#161616; --c-about-a:#242424; --c-about-b:#101010;
+          --c-q-a:#202020; --c-q-b:#0a0a0a; --c-st-a:#363636; --c-st-b:#1e1e1e;
           --mini-fs:16px; --card-fs:24px; --full-fs:34px;
           --st:max(env(safe-area-inset-top),30px); --sb:max(env(safe-area-inset-bottom),14px);
           }
           * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-          html, body { margin:0; height:100%; background:var(--bg); color:#fff; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; overflow:hidden; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+          html, body { margin:0; height:100%; background:var(--bg); color:#fff; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; overflow:hidden; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; -webkit-text-size-adjust:100%; }
           img { pointer-events:none; -webkit-user-drag:none; }
           button { font-family:inherit; border:0; background:none; color:inherit; padding:0; cursor:pointer; }
           input { font-family:inherit; }
@@ -84,11 +84,12 @@ jobs:
           .eq.paused i { animation-play-state:paused; }
           @keyframes shimmer { 0% { background-position:-200px 0; } 100% { background-position:200px 0; } }
           .bgfx { position:fixed; inset:0; pointer-events:none; z-index:0; background:radial-gradient(60% 36% at 0% 0%,rgba(30,215,96,.17),transparent 70%),radial-gradient(52% 32% at 100% 14%,rgba(139,92,246,.18),transparent 70%),radial-gradient(60% 30% at 50% 100%,rgba(34,211,238,.07),transparent 70%); }
-          #app { position:fixed; inset:0; overflow-y:auto; padding:var(--st) 16px 190px; z-index:1; }
-          .top { display:flex; align-items:flex-end; justify-content:space-between; padding:16px 0 16px; }
+          #app { position:fixed; inset:0; overflow-y:auto; padding:var(--st) 16px 190px; z-index:1; -webkit-overflow-scrolling:touch; }
+          .top { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; padding:16px 0 16px; }
+          .hello { min-width:0; }
           .hello small { display:block; color:var(--txt2); font-weight:800; font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
           .hello h1 { margin:3px 0 0; font-size:30px; font-weight:900; letter-spacing:-.8px; }
-          .net { display:inline-flex; align-items:center; gap:8px; padding:10px 15px; border-radius:99px; font-size:12px; font-weight:900; white-space:nowrap; transition:all .3s; }
+          .net { display:inline-flex; align-items:center; gap:8px; padding:10px 15px; border-radius:99px; font-size:12px; font-weight:900; white-space:nowrap; transition:all .3s; flex-shrink:0; }
           .net.on { background:linear-gradient(135deg,var(--hx),var(--hx3)); color:#03130a; box-shadow:0 10px 26px rgba(30,215,96,.28); cursor:pointer; }
           .net.on:active { transform:scale(.95); }
           .net.off { background:rgba(251,191,36,.12); color:#fbbf24; border:1px solid rgba(251,191,36,.35); }
@@ -111,6 +112,9 @@ jobs:
           .hbtn:active { transform:scale(.97); }
           .hbtn.g { background:linear-gradient(135deg,var(--hx),#12a64a); color:#03130a; box-shadow:0 12px 28px rgba(30,215,96,.25); }
           .hbtn.v { background:linear-gradient(135deg,var(--hx2),#6d28d9); color:#fff; box-shadow:0 12px 28px rgba(139,92,246,.25); }
+          .hbtn.x { height:44px; border-radius:16px; font-size:13.5px; background:rgba(255,255,255,.09); color:#fff; }
+          .hbtn.x.danger { color:#ff6b6b; background:rgba(255,68,68,.1); }
+          .pl-new { width:100%; height:50px; margin-bottom:12px; }
           .sec-h { display:flex; align-items:center; justify-content:space-between; margin:4px 0 12px; }
           .sec-h b { font-size:18px; font-weight:900; letter-spacing:-.3px; }
           .sec-h span { font-size:12px; font-weight:700; color:var(--txt2); }
@@ -121,12 +125,12 @@ jobs:
           .tile b { display:block; font-size:13.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
           .tile span { display:block; font-size:12px; font-weight:600; color:var(--txt2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
           .tabs { display:flex; gap:8px; overflow-x:auto; margin:0 -16px 12px; padding:0 16px; }
-          .tab { flex:none; padding:10px 18px; border-radius:99px; background:var(--surf); border:1px solid var(--line); font-size:13.5px; font-weight:800; color:rgba(255,255,255,.75); transition:all .2s; }
+          .tab { flex:none; padding:10px 18px; border-radius:99px; background:var(--surf); border:1px solid var(--line); font-size:13.5px; font-weight:800; color:rgba(255,255,255,.75); transition:all .2s; white-space:nowrap; }
           .tab.on { background:#fff; color:#000; border-color:#fff; }
-          .subbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
-          .subbar > span { font-size:12px; font-weight:700; color:var(--txt2); }
-          .sorts { display:flex; gap:6px; }
-          .sortb { padding:6px 12px; border-radius:99px; font-size:11.5px; font-weight:800; color:var(--txt2); background:var(--surf); }
+          .subbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+          .subbar > span { font-size:12px; font-weight:700; color:var(--txt2); min-width:0; }
+          .sorts { display:flex; gap:6px; flex-wrap:wrap; }
+          .sortb { padding:6px 12px; border-radius:99px; font-size:11.5px; font-weight:800; color:var(--txt2); background:var(--surf); white-space:nowrap; }
           .sortb.on { color:#03130a; background:var(--hx); }
           .art { position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#fff; font-weight:900; }
           .art img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
@@ -139,7 +143,7 @@ jobs:
           .rtitle { font-size:14.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
           .row.active .rtitle { color:var(--hx); }
           .rartist { font-size:12.5px; font-weight:600; color:var(--txt2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
-          .rmeta { font-size:10px; color:#7b8190; margin-top:3px; display:flex; gap:6px; align-items:center; font-weight:700; }
+          .rmeta { font-size:10px; color:#7b8190; margin-top:3px; display:flex; gap:6px; align-items:center; font-weight:700; flex-wrap:wrap; }
           .tagx { padding:1px 6px; border-radius:5px; font-size:9px; font-weight:900; background:rgba(255,255,255,.09); color:#d1d5db; border:1px solid rgba(255,255,255,.14); }
           .tagx.l { color:var(--hx); border-color:rgba(30,215,96,.4); background:rgba(30,215,96,.1); }
           .rmore { width:38px; height:38px; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.5); border-radius:50%; flex-shrink:0; }
@@ -153,8 +157,9 @@ jobs:
           .arow { display:flex; align-items:center; gap:14px; padding:8px; border-radius:18px; cursor:pointer; }
           .arow:active { background:rgba(255,255,255,.07); }
           .arow .art { width:56px; height:56px; border-radius:50%; font-size:22px; box-shadow:0 6px 16px rgba(0,0,0,.35); }
+          .arow .art.plart { border-radius:16px; }
           .arow .rt b { display:block; font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-          .arow .rt span { display:block; font-size:12.5px; font-weight:600; color:var(--txt2); margin-top:2px; }
+          .arow .rt span { display:block; font-size:12.5px; font-weight:600; color:var(--txt2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
           .arow .fld { width:56px; height:56px; border-radius:16px; background:linear-gradient(135deg,rgba(139,92,246,.35),rgba(30,215,96,.25)); display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
           .empty { text-align:center; color:#8b8b95; margin-top:50px; font-weight:600; line-height:1.7; padding:0 24px; }
           .empty .eic { width:84px; height:84px; margin:0 auto 18px; border-radius:28px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,rgba(30,215,96,.2),rgba(139,92,246,.2)); color:#fff; }
@@ -171,14 +176,16 @@ jobs:
           .d-bg { position:absolute; inset:-90px 0 0 0; pointer-events:none; }
           .d-art { position:relative; width:200px; height:200px; border-radius:26px; font-size:64px; box-shadow:0 24px 60px rgba(0,0,0,.6); margin-bottom:18px; }
           .d-art.avatar { border-radius:50%; font-size:96px; letter-spacing:-2px; }
-          .d-head h2 { position:relative; margin:0; font-size:24px; font-weight:900; letter-spacing:-.5px; max-width:100%; }
+          .d-head h2 { position:relative; margin:0; font-size:24px; font-weight:900; letter-spacing:-.5px; max-width:100%; word-break:break-word; }
           .d-head p { position:relative; margin:6px 0 16px; color:rgba(255,255,255,.65); font-size:13px; font-weight:700; }
           .d-acts { position:relative; display:flex; gap:12px; width:100%; }
           .d-acts .hbtn { flex:1; height:50px; }
+          .d-acts .hbtn.x { height:44px; }
+          .d-acts2 { margin-top:10px; }
           #dList { padding:0 16px; }
-          #shBack { position:fixed; inset:0; z-index:135; background:rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .25s; display:flex; flex-direction:column; justify-content:flex-end; }
+          #shBack { position:fixed; inset:0; z-index:135; background:rgba(0,0,0,.6); opacity:0; pointer-events:none; transition:opacity .25s; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; }
           #shBack.open { opacity:1; pointer-events:auto; }
-          #shBox { background:#14141b; border-radius:28px 28px 0 0; border-top:1px solid rgba(255,255,255,.1); padding:12px 14px calc(var(--sb) + 14px); transform:translateY(100%); transition:transform .35s cubic-bezier(.32,.72,0,1); box-shadow:0 -20px 60px rgba(0,0,0,.6); }
+          #shBox { width:100%; max-height:88vh; max-height:88dvh; overflow-y:auto; background:#14141b; border-radius:28px 28px 0 0; border-top:1px solid rgba(255,255,255,.1); padding:12px 14px calc(var(--sb) + 14px); transform:translateY(100%); transition:transform .35s cubic-bezier(.32,.72,0,1); box-shadow:0 -20px 60px rgba(0,0,0,.6); }
           #shBack.open #shBox { transform:none; }
           .sh-grab { display:flex; justify-content:center; padding:2px 0 10px; } .sh-grab i { width:40px; height:5px; border-radius:99px; background:rgba(255,255,255,.25); }
           .sh-head { display:flex; align-items:center; gap:12px; padding:4px 8px 14px; border-bottom:1px solid var(--line); margin-bottom:6px; }
@@ -190,7 +197,7 @@ jobs:
           .sh-x:active { background:rgba(255,255,255,.2); }
           .sh-act { width:100%; display:flex; align-items:center; gap:16px; padding:14px 10px; border-radius:16px; font-size:15px; font-weight:700; text-align:left; }
           .sh-act:active { background:rgba(255,255,255,.07); }
-          .sh-act svg { color:rgba(255,255,255,.75); }
+          .sh-act svg { color:rgba(255,255,255,.75); flex-shrink:0; }
           .sh-act.danger { color:#ff6b6b; } .sh-act.danger svg { color:#ff6b6b; }
           .sh-act.cancel { justify-content:center; background:rgba(255,255,255,.08); margin-top:8px; font-weight:800; }
           #mini { position:fixed; left:8px; right:8px; bottom:40px; height:56px; border-radius:10px; z-index:90; cursor:pointer; overflow:hidden; display:none; box-shadow:0 10px 30px rgba(0,0,0,.6); background:linear-gradient(100deg,var(--base) 0%,var(--deep) 100%); transition:opacity .35s, transform .35s; }
@@ -210,15 +217,15 @@ jobs:
           #player.open { transform:none; opacity:1; pointer-events:auto; }
           .p-bg { position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 55% at 50% 0%,var(--glow) 0%,transparent 65%), linear-gradient(to bottom,rgba(0,0,0,.1) 0%,rgba(0,0,0,.72) 100%); }
           .p-scroll { position:absolute; inset:0; overflow-y:auto; overflow-x:hidden; }
-          .p-main { min-height:100dvh; display:flex; flex-direction:column; }
+          .p-main { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
           .p-top { display:flex; align-items:center; justify-content:space-between; padding:calc(var(--st) + 6px) 20px 8px; }
-          .ib { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+          .ib { width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
           .ib:active { opacity:.5; }
           .p-ctx { flex:1; min-width:0; text-align:center; padding:0 8px; display:flex; flex-direction:column; gap:2px; }
           .p-ctx-t { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.7); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
           .p-ctx-n { font-size:13px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
           .p-art-wrap { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:8px 32px; }
-          .p-art { width:100%; aspect-ratio:1/1; max-width:380px; max-height:50vh; border-radius:10px; font-size:84px; box-shadow:0 25px 60px -10px var(--glow),0 15px 40px rgba(0,0,0,.5); background:#282828; }
+          .p-art { width:100%; aspect-ratio:1/1; max-width:380px; max-height:50vh; max-height:50dvh; border-radius:10px; font-size:84px; box-shadow:0 25px 60px -10px var(--glow),0 15px 40px rgba(0,0,0,.5); background:#282828; }
           .p-bottom { padding:8px 20px calc(var(--sb) + 10px); }
           .p-mini-lyr { position:relative; width:100%; min-height:75px; margin-bottom:12px; overflow:hidden; display:flex; align-items:center; mask-image:linear-gradient(to bottom,transparent 0%,#000 10%,#000 90%,transparent 100%); -webkit-mask-image:linear-gradient(to bottom,transparent 0%,#000 10%,#000 90%,transparent 100%); }
           .p-mini-lyr.off { display:none; }
@@ -261,7 +268,7 @@ jobs:
           .pill { width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,.3); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.85); }
           #lyrList, #fullList { position:relative; z-index:1; display:flex; flex-direction:column; gap:20px; }
           #lyrScroll { position:relative; z-index:1; max-height:300px; overflow-y:auto; padding-bottom:40px; }
-          .ly { margin:0; cursor:pointer; line-height:1.2; font-size:var(--card-fs); transition:all .7s ease-out; transform-origin:left; font-weight:800; color:var(--upcoming); opacity:.85; transform:translateY(12px); text-shadow:0 1px 10px rgba(0,0,0,.25); }
+          .ly { margin:0; cursor:pointer; line-height:1.2; font-size:var(--card-fs); transition:all .7s ease-out; transform-origin:left; font-weight:800; color:var(--upcoming); opacity:.85; transform:translateY(12px); text-shadow:0 1px 10px rgba(0,0,0,.25); word-break:break-word; }
           .ly.act { font-weight:900; color:var(--active); opacity:1; transform:none; text-shadow:0 0 28px var(--glow),0 2px 18px rgba(0,0,0,.35); }
           .ly.past { font-weight:700; color:var(--past); opacity:1; transform:translateY(-8px); text-shadow:none; }
           #fullList .ly { font-size:var(--full-fs); }
@@ -275,7 +282,7 @@ jobs:
           .tile2.wide { grid-column:span 2; }
           .tile2 .ti { width:36px; height:36px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
           .tile2 .tl { font-size:11px; font-weight:700; color:rgba(255,255,255,.45); }
-          .tile2 .tv { font-size:14.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+          .tile2 .tv { font-size:14.5px; font-weight:800; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; word-break:break-word; line-height:1.25; }
           .tile2 > div:last-child { min-width:0; }
           .chips { position:relative; z-index:1; display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
           .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:99px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.88); font-size:12px; font-weight:700; }
@@ -290,7 +297,7 @@ jobs:
           #queue { position:fixed; inset:0; z-index:110; background:#09090b; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform .3s; }
           #queue.open { transform:none; }
           .q-bg { position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg,var(--c-q-a) 0%,var(--c-q-b) 46%,#070708 100%); transition:background .7s; }
-          .q-glow { position:absolute; top:-110px; left:50%; transform:translateX(-50%); width:150%; height:380px; pointer-events:none; opacity:.7; background:radial-gradient(closest-side,var(--glow),transparent); }
+          .q-glow { position:absolute; top:-110px; left:50%; transform:translateX(-50%); width:150%; height:380px; pointer-events:none; opacity:.6; background:radial-gradient(closest-side,var(--glow),transparent); }
           .q-blob { position:absolute; bottom:96px; right:-96px; width:300px; height:300px; border-radius:50%; pointer-events:none; opacity:.3; filter:blur(80px); background:var(--c-st-a); }
           .q-top { position:relative; z-index:3; display:flex; align-items:center; justify-content:space-between; padding:calc(var(--st) + 4px) 20px 12px; }
           .q-top .ib { background:rgba(255,255,255,.1); }
@@ -309,13 +316,14 @@ jobs:
           .q-now .bar { position:absolute; left:0; bottom:0; height:3px; width:100%; background:rgba(255,255,255,.1); }
           .q-now .bar i { display:block; height:100%; background:linear-gradient(to right,var(--accent),var(--light)); width:0; }
           .q-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
-          .qs { padding:12px; border-radius:18px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:2px; }
+          .qs { padding:12px; border-radius:18px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; gap:2px; min-width:0; }
           .qs b { font-size:18px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
           .qs span { font-size:11px; font-weight:700; color:rgba(255,255,255,.55); }
           .q-top-art { padding:16px; border-radius:26px; border:1px solid rgba(255,255,255,.08); background:linear-gradient(160deg,var(--c-about-a),var(--c-about-b)); display:flex; flex-direction:column; gap:12px; margin-bottom:22px; }
           .q-top-art > span { font-size:12px; font-weight:800; color:rgba(255,255,255,.7); }
           .bar-row { display:flex; flex-direction:column; gap:6px; }
           .bar-row .l { display:flex; justify-content:space-between; gap:12px; font-size:13px; font-weight:700; }
+          .bar-row .l span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
           .bar-row .l span:last-child { color:rgba(255,255,255,.55); }
           .bar-row .tr { height:5px; border-radius:99px; background:rgba(0,0,0,.3); overflow:hidden; }
           .bar-row .tr i { display:block; height:100%; border-radius:99px; background:linear-gradient(to right,var(--accent),var(--light)); }
@@ -345,11 +353,11 @@ jobs:
           .qb .rp em { position:absolute; top:-4px; right:-5px; background:var(--accent); color:#000; font-size:9px; font-weight:900; border-radius:50%; width:12px; height:12px; display:flex; align-items:center; justify-content:center; font-style:normal; }
           .qa { padding:9px 16px; border-radius:99px; font-size:13px; font-weight:800; background:rgba(255,255,255,.1); }
           .qa.danger { color:#ff5a5a; background:rgba(255,68,68,.12); }
-          #setBack { position:fixed; inset:0; z-index:130; background:rgba(0,0,0,.65); opacity:0; pointer-events:none; transition:opacity .3s; display:flex; flex-direction:column; justify-content:flex-end; }
+          #setBack { position:fixed; inset:0; z-index:130; background:rgba(0,0,0,.65); opacity:0; pointer-events:none; transition:opacity .3s; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; }
           #setBack.open { opacity:1; pointer-events:auto; }
-          #setSheet { position:relative; width:100%; border-radius:32px 32px 0 0; border-top:1px solid rgba(255,255,255,.1); max-height:88vh; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform .4s cubic-bezier(.32,.72,0,1); background:linear-gradient(180deg,var(--c-q-a) 0%,#0c0c0e 42%); box-shadow:0 -20px 60px rgba(0,0,0,.6); }
+          #setSheet { position:relative; width:100%; border-radius:32px 32px 0 0; border-top:1px solid rgba(255,255,255,.1); max-height:88vh; max-height:88dvh; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform .4s cubic-bezier(.32,.72,0,1); background:linear-gradient(180deg,var(--c-q-a) 0%,#0c0c0e 42%); box-shadow:0 -20px 60px rgba(0,0,0,.6); }
           #setBack.open #setSheet { transform:none; }
-          .s-glow { position:absolute; top:-90px; left:50%; transform:translateX(-50%); width:120%; height:220px; opacity:.6; pointer-events:none; background:radial-gradient(closest-side,var(--glow),transparent); }
+          .s-glow { position:absolute; top:-90px; left:50%; transform:translateX(-50%); width:120%; height:220px; opacity:.5; pointer-events:none; background:radial-gradient(closest-side,var(--glow),transparent); }
           .grab { position:relative; z-index:1; display:flex; justify-content:center; padding:12px 0 4px; }
           .grab i { width:40px; height:5px; border-radius:99px; background:rgba(255,255,255,.25); }
           .s-head { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; padding:10px 24px 14px; }
@@ -387,9 +395,56 @@ jobs:
           .t-opt { padding:13px 16px; border-radius:14px; background:rgba(255,255,255,.06); display:flex; justify-content:space-between; align-items:center; font-weight:600; text-align:left; width:100%; }
           .t-opt.on { background:rgba(255,255,255,.16); color:var(--accent); }
           .t-off { padding:13px 16px; border-radius:14px; border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.5); margin-top:4px; text-align:left; width:100%; }
+          #nameBack { position:fixed; inset:0; z-index:150; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; padding:24px; }
+          #nameBack.open { display:flex; }
+          .nm-box { width:100%; max-width:380px; border-radius:26px; padding:22px; border:1px solid rgba(255,255,255,.1); background:#16161d; display:flex; flex-direction:column; gap:14px; box-shadow:0 30px 60px rgba(0,0,0,.6); }
+          .nm-box h4 { margin:0; font-size:18px; font-weight:800; }
+          .nm-box input { width:100%; height:48px; border-radius:14px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07); color:#fff; font-size:15px; font-weight:600; padding:0 14px; outline:none; user-select:text; -webkit-user-select:text; }
+          .nm-box input:focus { border-color:rgba(30,215,96,.6); }
+          .nm-row { display:flex; gap:10px; }
+          .nm-row button { flex:1; height:46px; border-radius:14px; font-size:14px; font-weight:800; background:rgba(255,255,255,.09); }
+          .nm-row button.ok { background:var(--hx); color:#03130a; }
           #toast { position:fixed; left:50%; bottom:120px; transform:translate(-50%,20px); background:rgba(20,20,26,.96); border:1px solid rgba(255,255,255,.14); padding:11px 18px; border-radius:99px; font-size:13px; font-weight:700; z-index:200; opacity:0; pointer-events:none; transition:all .3s; max-width:88%; text-align:center; }
           #toast.show { opacity:1; transform:translate(-50%,0); }
           #toast button { color:var(--hx); font-weight:900; margin-left:10px; pointer-events:auto; }
+
+          /* ===== Responsive: small phones, tablets, landscape ===== */
+          @media (max-width:360px) {
+          .hello h1 { font-size:25px; }
+          .tile, .tart { width:116px; } .tart { height:116px; }
+          .d-art { width:160px; height:160px; }
+          .p-titles .t { font-size:19px; }
+          .hbtn { font-size:14px; }
+          .net { padding:9px 12px; }
+          }
+          @media (min-width:640px) {
+          #app > * { width:100%; max-width:760px; margin-left:auto; margin-right:auto; }
+          #app > .tabs { padding-left:0; padding-right:0; }
+          .car { margin-left:0; margin-right:0; padding-left:0; padding-right:0; }
+          .grid2 { grid-template-columns:repeat(3,1fr); gap:20px 16px; }
+          .d-head, #dList { max-width:760px; margin-left:auto; margin-right:auto; }
+          .d-art { width:240px; height:240px; }
+          .p-top, .p-art-wrap, .p-bottom, .cards, .fl-top, .fl-bottom, .q-top { width:100%; max-width:600px; margin-left:auto; margin-right:auto; }
+          .fl-scroll { padding-left:max(24px,calc((100% - 600px)/2)); padding-right:max(24px,calc((100% - 600px)/2)); }
+          #qScroll { padding-left:max(20px,calc((100% - 640px)/2)); padding-right:max(20px,calc((100% - 640px)/2)); }
+          #qBar > div { max-width:600px; margin:0 auto; }
+          #setSheet, #shBox { max-width:640px; }
+          #mini { left:max(8px,calc(50% - 320px)); right:max(8px,calc(50% - 320px)); }
+          .ly { font-size:calc(var(--card-fs) + 2px); }
+          }
+          @media (min-width:1000px) {
+          #app > * { max-width:900px; }
+          .grid2 { grid-template-columns:repeat(4,1fr); }
+          .d-head, #dList { max-width:900px; }
+          }
+          @media (orientation:landscape) and (max-height:520px) {
+          .p-art { max-height:38vh; max-height:38dvh; }
+          .p-art-wrap { padding:4px 32px; }
+          .p-main { min-height:max(100dvh,560px); }
+          .d-art { width:130px; height:130px; margin-bottom:10px; }
+          #mini { bottom:14px; }
+          #toast { bottom:80px; }
+          }
           </style>
           </head>
           <body>
@@ -556,6 +611,7 @@ jobs:
           </div>
           <div id="shBack"><div id="shBox"></div></div>
           <div id="timerBack"><div class="t-box" id="timerBox"></div></div>
+          <div id="nameBack"><div class="nm-box"><h4 id="nmTitle">New playlist</h4><input id="nmInput" type="text" maxlength="60" placeholder="Playlist name" autocomplete="off" /><div class="nm-row"><button id="nmCancel">Cancel</button><button id="nmOk" class="ok">Create</button></div></div></div>
           <div id="toast"></div>
           <audio id="aud" preload="auto"></audio>
           <script>
@@ -574,7 +630,7 @@ jobs:
           var mb = function (n) { return (n / 1048576).toFixed(1); };
           var hueOf = function (str) { var h = 0; str = String(str || ''); for (var i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h); return Math.abs(h) % 360; };
           var initial = function (s) { var a = Array.from(String(s || '?').trim()); return (a[0] || '?').toUpperCase(); };
-          var avBg = function (s) { var h = hueOf(s); return 'linear-gradient(135deg,hsl(' + h + ',55%,42%),hsl(' + ((h + 50) % 360) + ',55%,26%))'; };
+          var avBg = function (s) { var h = hueOf(s); return 'linear-gradient(135deg,hsl(' + h + ',50%,34%),hsl(' + ((h + 50) % 360) + ',50%,22%))'; };
           var clamp = function (v, a, b) { return Math.min(b, Math.max(a, v)); };
           var H360 = function (h) { return ((h % 360) + 360) % 360; };
           var hs = function (h, s, l, a) {
@@ -627,45 +683,47 @@ jobs:
           trash: function (s) { return svg('<path d="M4.5 7h15"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/>', { size: s, stroke: true }); },
           note: function (s) { return svg('<path d="M9 18V6.5l10-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>', { size: s, stroke: true, sw: 1.8 }); },
           lyrnote: function (s) { return svg('<path d="M19.5 2.6v12.9a3.6 3.6 0 1 1-2.2-3.3V6.4l-8.6 1.7v9.4a3.6 3.6 0 1 1-2.2-3.3V5.4a1.4 1.4 0 0 1 1.1-1.4l9.6-1.9a1.4 1.4 0 0 1 1.7 1.4z"/>', { size: s }); },
-          lossless: function (s) { return svg('<path d="M12 2.8 20 12l-8 9.2L4 12z"/>', { size: s }); }
+          lossless: function (s) { return svg('<path d="M12 2.8 20 12l-8 9.2L4 12z"/>', { size: s }); },
+          plus: function (s) { return svg('<path d="M12 5v14M5 12h14"/>', { size: s, stroke: true, sw: 2.4 }); }
           };
 
-          /* ================= COLOR DICTIONARY (player only) ================= */
-          var E = function (n, h, s, l, u, c) { return { n: n, h: h, s: s, l: l, u: u, c: c }; };
+          /* ================= COLOR DICTIONARY (player only, dark & rich tones — no pale colors) ================= */
+          var E = function (n, h, s, l, u, c) { return { n: n, h: h, s: Math.min(s, .72), l: Math.min(l, .3), u: u, c: c }; };
           var DICT = [
-          E('Crimson', 350, .70, .28, -28, 24), E('Ruby', 358, .74, .29, 32, 28), E('Scarlet', 6, .78, .30, 34, 26),
-          E('Vermilion', 14, .80, .30, -30, 30), E('Burnt Orange', 22, .76, .29, 40, 28), E('Tangerine', 30, .82, .31, -34, 30),
-          E('Amber', 38, .80, .30, 36, 32), E('Honey', 45, .72, .30, -32, 28), E('Gold', 50, .70, .29, 40, 30),
-          E('Lemon', 58, .62, .28, -40, 32), E('Olive', 72, .48, .24, 50, 34), E('Lime', 88, .55, .26, -44, 30),
-          E('Fern', 105, .45, .24, 48, 34), E('Forest', 125, .46, .22, -40, 30), E('Emerald', 146, .58, .25, 44, 30),
-          E('Jade', 158, .60, .25, -38, 28), E('Mint', 168, .52, .27, 40, 30), E('Teal', 178, .62, .25, -36, 28),
-          E('Turquoise', 186, .66, .28, 40, 30), E('Cyan', 194, .70, .29, -38, 28), E('Sky', 204, .70, .30, 42, 30),
-          E('Azure', 212, .72, .31, -40, 28), E('Ocean', 220, .66, .28, 40, 30), E('Royal Blue', 228, .68, .31, -42, 30),
-          E('Cobalt', 236, .64, .32, 44, 30), E('Indigo', 246, .56, .32, -40, 30), E('Iris', 256, .58, .34, 42, 28),
-          E('Violet', 268, .56, .34, -42, 28), E('Amethyst', 278, .52, .33, 44, 30), E('Orchid', 290, .48, .34, -42, 30),
-          E('Plum', 302, .44, .30, 40, 30), E('Magenta', 314, .62, .31, -38, 28), E('Fuchsia', 324, .68, .32, 40, 28),
-          E('Hot Pink', 334, .70, .33, -40, 28), E('Rose', 342, .66, .31, 38, 26)
+          E('Crimson', 350, .68, .26, -28, 24), E('Ruby', 358, .70, .27, 32, 28), E('Scarlet', 6, .72, .28, 34, 26),
+          E('Vermilion', 14, .72, .28, -30, 30), E('Burnt Orange', 22, .70, .27, 40, 28), E('Tangerine', 30, .72, .28, -34, 30),
+          E('Amber', 38, .70, .27, 36, 32), E('Honey', 45, .64, .27, -32, 28), E('Gold', 50, .62, .26, 40, 30),
+          E('Lemon', 58, .56, .25, -40, 32), E('Olive', 72, .46, .22, 50, 34), E('Lime', 88, .50, .24, -44, 30),
+          E('Fern', 105, .44, .22, 48, 34), E('Forest', 125, .46, .21, -40, 30), E('Emerald', 146, .56, .23, 44, 30),
+          E('Jade', 158, .58, .23, -38, 28), E('Mint', 168, .50, .24, 40, 30), E('Teal', 178, .60, .23, -36, 28),
+          E('Turquoise', 186, .62, .25, 40, 30), E('Cyan', 194, .66, .26, -38, 28), E('Sky', 204, .66, .27, 42, 30),
+          E('Azure', 212, .68, .28, -40, 28), E('Ocean', 220, .64, .26, 40, 30), E('Royal Blue', 228, .66, .29, -42, 30),
+          E('Cobalt', 236, .62, .29, 44, 30), E('Indigo', 246, .54, .29, -40, 30), E('Iris', 256, .56, .30, 42, 28),
+          E('Violet', 268, .54, .30, -42, 28), E('Amethyst', 278, .50, .29, 44, 30), E('Orchid', 290, .46, .29, -42, 30),
+          E('Plum', 302, .44, .27, 40, 30), E('Magenta', 314, .58, .28, -38, 28), E('Fuchsia', 324, .62, .29, 40, 28),
+          E('Hot Pink', 334, .64, .29, -40, 28), E('Rose', 342, .62, .28, 38, 26)
           ];
-          var NEU = { noir: E('Noir', 230, .05, .11, 0, 0), graphite: E('Graphite', 220, .05, .25, 0, 0), slate: E('Slate', 215, .14, .26, 0, 0), ash: E('Warm Ash', 28, .10, .26, 0, 0), silver: E('Silver', 210, .05, .34, 0, 0) };
+          var NEU = { noir: E('Noir', 230, .05, .10, 0, 0), graphite: E('Graphite', 220, .05, .21, 0, 0), slate: E('Slate', 215, .14, .22, 0, 0), ash: E('Warm Ash', 28, .10, .22, 0, 0), silver: E('Silver', 210, .05, .26, 0, 0) };
           function nearest(hue) { var best = DICT[0], bd = 999; for (var i = 0; i < DICT.length; i++) { var d = Math.abs(((hue - DICT[i].h + 540) % 360) - 180); if (d < bd) { bd = d; best = DICT[i]; } } return best; }
           function buildPalette(hue, s, l, neutral) {
           var e;
           if (neutral) e = l < .2 ? NEU.noir : l > .62 ? NEU.silver : (hue >= 180 && hue <= 270) ? NEU.slate : (hue < 70 || hue > 330) ? NEU.ash : NEU.graphite;
           else e = nearest(hue);
-          var sat = neutral ? e.s : clamp(e.s * .6 + s * .4, .3, .8);
-          var bl = neutral ? clamp(e.l * .6 + l * .4, .1, .4) : clamp(e.l * .7 + l * .3, .2, .36);
+          var sat = neutral ? e.s : clamp(e.s * .6 + s * .4, .3, .72);
+          var bl = neutral ? clamp(e.l * .6 + l * .4, .1, .28) : clamp(e.l * .7 + l * .3, .18, .29);
           var h = e.h, sh = neutral ? 0 : e.c, up = neutral ? 0 : e.u;
           return {
-          name: e.n, base: hs(h, sat, bl), deep: hs(h, sat * .9, bl * .5),
-          accent: hs(h, neutral ? sat : Math.min(.85, sat + .15), .66), light: hs(h, neutral ? .05 : sat * .75, .9), glow: hs(h, sat, .5, .45),
-          active: hs(h, neutral ? .04 : .55, .97), past: hs(h, neutral ? .04 : .35, .9, .36), upcoming: hs(h + up, neutral ? .05 : .85, .77, .9),
+          name: e.n, h: h, sat: sat, neutral: neutral,
+          base: hs(h, sat, bl), deep: hs(h, sat * .9, bl * .5),
+          accent: hs(h, neutral ? sat : Math.min(.78, sat + .08), .56), light: hs(h, neutral ? .05 : sat * .7, .72), glow: hs(h, sat, .4, .42),
+          active: hs(h, neutral ? .04 : .4, .95), past: hs(h, neutral ? .04 : .3, .78, .36), upcoming: hs(h + up, neutral ? .05 : .62, .7, .9),
           lyr: [hs(h, sat, bl), hs(h, sat * .9, bl * .5)],
-          about: [hs(h + sh * 1.6, sat, .27), hs(h + sh * 2.6, sat * .8, .12)],
-          queue: [hs(h, sat, .24), hs(h + sh * .5, sat * .8, .08)],
-          stats: [hs(h - sh * 2, sat, .36), hs(h - sh * 2, sat * .8, .2)]
+          about: [hs(h + sh * 1.6, sat, .21), hs(h + sh * 2.6, sat * .8, .09)],
+          queue: [hs(h, sat, .2), hs(h + sh * .5, sat * .8, .07)],
+          stats: [hs(h - sh * 2, sat, .3), hs(h - sh * 2, sat * .8, .17)]
           };
           }
-          var DEFAULT_PAL = buildPalette(0, 0, .325, true);
+          var DEFAULT_PAL = buildPalette(0, 0, .28, true);
           function rgbToHsl(r, g, b) { r /= 255; g /= 255; b /= 255; var max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, h = 0, s = 0; if (max !== min) { var d = max - min; s = l > .5 ? d / (2 - max - min) : d / (max + min); if (max === r) h = (g - b) / d + (g < b ? 6 : 0); else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h /= 6; } return [h, s, l]; }
           function extractPalette(data) {
           var HUES = 24, bk = [], i; for (i = 0; i <= HUES; i++) bk.push({ w: 0, r: 0, g: 0, b: 0 });
@@ -693,10 +751,11 @@ jobs:
           s.setProperty('--c-q-a', p.queue[0]); s.setProperty('--c-q-b', p.queue[1]);
           s.setProperty('--c-st-a', p.stats[0]); s.setProperty('--c-st-b', p.stats[1]);
           var sp = $('#sPal'); if (sp) sp.textContent = 'Now playing · ' + p.name;
+          var t = cur(); if (t) renderDetails(t);
           }
           function paletteFor(t) {
           if (palCache[t.id]) { applyPalette(palCache[t.id]); return; }
-          var fallback = function () { var p = buildPalette(hueOf(t.baseName || t.title), .5, .3, false); palCache[t.id] = p; if (cur() === t) applyPalette(p); };
+          var fallback = function () { var p = buildPalette(hueOf(t.baseName || t.title), .5, .28, false); palCache[t.id] = p; if (cur() === t) applyPalette(p); };
           if (!t.hasArt) { fallback(); return; }
           var img = new Image(); img.crossOrigin = 'anonymous';
           img.onload = function () {
@@ -712,14 +771,16 @@ jobs:
 
           /* ================= state ================= */
           var tracks = [], idMap = {}, order = [], baseOrder = [], pos = -1;
-          var shuffle = false, repeat = 0, searchQ = '', tab = 'songs', sortBy = localStorage.getItem('o_sort') || 'recent';
+          var shuffle = false, repeat = 0, searchQ = '', tab = 'songs', sortBy = localStorage.getItem('o_sort') || 'recent', gSort = localStorage.getItem('o_gsort') || 'count';
           var lines = [], activeIdx = -1, seeking = false, playerOpen = false, queueOpen = false, fullOpen = false;
           var settings = { lyr: true, word: true, mini: 'Medium', card: 'Medium' };
           try { var sv = JSON.parse(localStorage.getItem('o_settings') || '{}'); for (var k in sv) settings[k] = sv[k]; } catch (e) {}
           var liked = {}; try { liked = JSON.parse(localStorage.getItem('o_liked') || '{}'); } catch (e) {}
+          var playlists = {}; try { playlists = JSON.parse(localStorage.getItem('o_pl') || '{}') || {}; } catch (e) { playlists = {}; }
           var sleepT = null, sleepRem = null, sleepInt = null, errCount = 0, pendingSeek = null, ixTotal = 0, ixDone = 0, loaded = false;
-          var recoverTries = 0, stallCnt = 0, lastCT = -1;
+          var recoverTries = 0, stallCnt = 0, lastCT = -1, lastRaw = '', lastNativeId = '';
           var cur = function () { return pos >= 0 ? tracks[order[pos]] : null; };
+          function rot(arr, ix) { return arr.slice(ix).concat(arr.slice(0, ix)); }
 
           /* ================= overlay stack (NO history API → close buttons always work) ================= */
           var ov = [];
@@ -728,7 +789,7 @@ jobs:
           function hideOv(n) {
           if (n === 'player') closePlayerUI(); else if (n === 'queue') closeQueueUI(); else if (n === 'settings') $('#setBack').classList.remove('open');
           else if (n === 'detail') $('#detail').classList.remove('open'); else if (n === 'full') closeFullUI(); else if (n === 'sheet') $('#shBack').classList.remove('open');
-          else if (n === 'timer') $('#timerBack').classList.remove('open');
+          else if (n === 'timer') $('#timerBack').classList.remove('open'); else if (n === 'name') { $('#nameBack').classList.remove('open'); try { $('#nmInput').blur(); } catch (e) {} }
           }
           /* Called by native Android back button. Returns true when an overlay was closed. */
           window.__onBack = function () { if (!ov.length) return false; closeOv(ov[ov.length - 1]); return true; };
@@ -751,7 +812,7 @@ jobs:
           }
           $('#netChip').addEventListener('click', function () { if (online) goOnline(); else toast('No internet connection'); });
           window.addEventListener('online', checkNet); window.addEventListener('offline', checkNet);
-          setInterval(checkNet, 2500);
+          setInterval(function () { if (!document.hidden) checkNet(); }, 2500);
 
           /* ================= marquee ================= */
           var mqObs = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(function (en) { en.forEach(function (e) { measureMq(e.target); }); }) : null;
@@ -793,7 +854,7 @@ jobs:
           ixDirty = true; refreshRows(t);
           }
           updateLibInfo();
-          clearTimeout(refreshT); refreshT = setTimeout(function () { if (tab === 'albums' || tab === 'artists') renderView(); renderRecent(); }, 900);
+          clearTimeout(refreshT); refreshT = setTimeout(function () { if (tab === 'albums' || tab === 'artists' || tab === 'playlists') renderView(); renderRecent(); }, 900);
           clearTimeout(ixSaveT); ixSaveT = setTimeout(saveIx, 2500);
           };
           window.__onMetaDone = function () { ixDone = ixTotal; updateLibInfo(); saveIx(); renderView(); renderRecent(); };
@@ -806,7 +867,7 @@ jobs:
           }
           if (cur() === t) setTrackTexts(t);
           }
-          function thumbBg(t) { var h = hueOf(t.baseName); return 'linear-gradient(135deg,hsl(' + h + ',45%,38%),hsl(' + ((h + 40) % 360) + ',45%,24%))'; }
+          function thumbBg(t) { var h = hueOf(t.baseName); return 'linear-gradient(135deg,hsl(' + h + ',42%,34%),hsl(' + ((h + 40) % 360) + ',42%,22%))'; }
           function artInner(t) { return t.hasArt ? '<img src="' + t.artUrl + '" onerror="this.remove()">' : '<span>' + esc((t.title || '?').charAt(0).toUpperCase()) + '</span>'; }
           function artBox(el, t) { el.style.background = thumbBg(t); el.innerHTML = artInner(t); }
           function qualityOf(t) {
@@ -820,7 +881,9 @@ jobs:
           if (!A || !A.getDownloadedFiles) { $('#libInfo').textContent = 'Open inside the Music8481 app'; $('#view').innerHTML = emptyHtml('Offline library works inside the Android app.', 'Open Music8481 on your phone.'); return; }
           var oldOrderIds = order.map(function (i) { return tracks[i] && tracks[i].id; }), oldBaseIds = baseOrder.map(function (i) { return tracks[i] && tracks[i].id; });
           var curId = cur() ? cur().id : null;
-          var raw = []; try { raw = JSON.parse(A.getDownloadedFiles() || '[]'); } catch (e) {}
+          var rawStr = '[]'; try { rawStr = A.getDownloadedFiles() || '[]'; } catch (e) {}
+          lastRaw = rawStr;
+          var raw = []; try { raw = JSON.parse(rawStr); } catch (e) {}
           idMap = {}; var todo = [];
           tracks = raw.map(function (o, i) {
           o.i = i; o.m = null; o.full = false; var c = ixCache[o.id];
@@ -837,6 +900,11 @@ jobs:
           renderHome();
           if (!cur()) restoreLast();
           }
+          /* Quick check when the app comes back to the foreground — reloads only if files changed on disk */
+          function softRescan() {
+          if (!loaded || !A || !A.getDownloadedFiles) return;
+          try { var s = A.getDownloadedFiles() || '[]'; if (s !== lastRaw) { loadTracks(); refreshDetail(); } } catch (e) {}
+          }
           function updateLibInfo() {
           var el = $('#libInfo'); if (!el) return;
           if (!loaded) { el.textContent = 'Scanning device…'; return; }
@@ -846,6 +914,44 @@ jobs:
           el.textContent = (ixTotal && ixDone < ixTotal) ? base + ' · indexing ' + ixDone + '/' + ixTotal : base;
           }
           function emptyHtml(t, s) { return '<div class="empty"><div class="eic">' + IC.note(40) + '</div><b>' + esc(t) + '</b>' + esc(s) + '</div>'; }
+
+          /* ================= PLAYLISTS (local, saved on device) ================= */
+          function savePl() { try { localStorage.setItem('o_pl', JSON.stringify(playlists)); } catch (e) {} renderTabs(); if (tab === 'playlists' && !searchQ) renderView(); }
+          function plList() { return Object.keys(playlists).map(function (k) { var p = playlists[k]; p.k = k; return p; }).sort(function (a, b) { return (b.updated || 0) - (a.updated || 0); }); }
+          function plTracks(k) { var p = playlists[k]; return p ? p.ids.map(function (id) { return idMap[id]; }).filter(Boolean) : []; }
+          function createPlaylist(name, firstId) {
+          name = String(name || '').trim(); if (!name) return null;
+          var k = 'p' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36);
+          playlists[k] = { name: name, ids: firstId ? [firstId] : [], created: Date.now(), updated: Date.now() };
+          savePl(); return k;
+          }
+          function addToPlaylist(k, id) {
+          var p = playlists[k]; if (!p || p.ids.indexOf(id) >= 0) return false;
+          p.ids.push(id); p.updated = Date.now(); savePl(); refreshDetail(); return true;
+          }
+          var nameCb = null;
+          function askName(title, initialVal, okLabel, cb) {
+          $('#nmTitle').textContent = title; var inp = $('#nmInput'); inp.value = initialVal || ''; $('#nmOk').textContent = okLabel || 'Save'; nameCb = cb;
+          $('#nameBack').classList.add('open'); pushOv('name'); setTimeout(function () { try { inp.focus(); inp.select(); } catch (e) {} }, 140);
+          }
+          function submitName() {
+          var v = $('#nmInput').value.trim(); if (!v) { toast('Enter a name'); return; }
+          var cb = nameCb; nameCb = null; closeOv('name'); if (cb) cb(v);
+          }
+          $('#nmOk').onclick = submitName; $('#nmCancel').onclick = function () { nameCb = null; closeOv('name'); };
+          $('#nmInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submitName(); } });
+          $('#nameBack').addEventListener('click', function (e) { if (e.target === $('#nameBack')) { nameCb = null; closeOv('name'); } });
+          function newPlaylistFlow(firstId) {
+          askName('New playlist', '', 'Create', function (n) {
+          var k = createPlaylist(n, firstId); if (!k) return;
+          toast(firstId ? 'Created “' + n + '” with 1 song' : 'Created “' + n + '”');
+          if (!firstId) openPlaylist(k);
+          });
+          }
+          function openPlaylist(k) {
+          var p = playlists[k]; if (!p) return; var T = plTracks(k);
+          openDetail({ name: p.name, tracks: T, plId: k, art: T.filter(function (t) { return t.hasArt; })[0] || T[0] }, 'playlists');
+          }
 
           /* ================= HOME rendering ================= */
           function greeting() { var h = new Date().getHours(); return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
@@ -863,13 +969,24 @@ jobs:
           return '<div class="tile" data-i="' + t.i + '"><div class="art tart" data-t="' + t.i + '" data-f="art" style="background:' + thumbBg(t) + '">' + artInner(t) + '</div><b data-t="' + t.i + '" data-f="title">' + esc(t.title) + '</b><span data-t="' + t.i + '" data-f="artist">' + esc(t.artist) + '</span></div>';
           }).join('') + '</div>';
           }
-          var TABS = [['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists'], ['folders', 'Folders'], ['liked', 'Liked']];
+          var TABS = [['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists'], ['playlists', 'Playlists'], ['folders', 'Folders'], ['liked', 'Liked']];
           function renderTabs() {
-          $('#tabs').innerHTML = TABS.map(function (x) { return '<button class="tab' + (tab === x[0] ? ' on' : '') + '" data-tab="' + x[0] + '">' + x[1] + (x[0] === 'liked' ? ' (' + Object.keys(liked).filter(function (id) { return idMap[id]; }).length + ')' : '') + '</button>'; }).join('');
-          $('#sortWrap').innerHTML = tab === 'songs' ? [['recent', 'Recent'], ['az', 'A–Z'], ['artist', 'Artist']].map(function (s) { return '<button class="sortb' + (sortBy === s[0] ? ' on' : '') + '" data-sort="' + s[0] + '">' + s[1] + '</button>'; }).join('') : '';
+          $('#tabs').innerHTML = TABS.map(function (x) {
+          var cnt = x[0] === 'liked' ? ' (' + Object.keys(liked).filter(function (id) { return idMap[id]; }).length + ')' : x[0] === 'playlists' ? ' (' + Object.keys(playlists).length + ')' : '';
+          return '<button class="tab' + (tab === x[0] ? ' on' : '') + '" data-tab="' + x[0] + '">' + x[1] + cnt + '</button>';
+          }).join('');
+          var sw = '';
+          if (tab === 'songs') sw = [['recent', 'Recent'], ['az', 'A–Z'], ['artist', 'Artist']].map(function (s) { return '<button class="sortb' + (sortBy === s[0] ? ' on' : '') + '" data-sort="' + s[0] + '">' + s[1] + '</button>'; }).join('');
+          else if (tab === 'albums' || tab === 'artists') sw = [['count', 'Most songs'], ['az', 'A–Z']].map(function (s) { return '<button class="sortb' + (gSort === s[0] ? ' on' : '') + '" data-sort="' + s[0] + '">' + s[1] + '</button>'; }).join('');
+          $('#sortWrap').innerHTML = sw;
           }
           $('#tabs').addEventListener('click', function (e) { var b = e.target.closest('.tab'); if (!b) return; tab = b.getAttribute('data-tab'); renderTabs(); renderView(); });
-          $('#sortWrap').addEventListener('click', function (e) { var b = e.target.closest('.sortb'); if (!b) return; sortBy = b.getAttribute('data-sort'); try { localStorage.setItem('o_sort', sortBy); } catch (x) {} renderTabs(); renderView(); });
+          $('#sortWrap').addEventListener('click', function (e) {
+          var b = e.target.closest('.sortb'); if (!b) return; var v = b.getAttribute('data-sort');
+          if (tab === 'songs') { sortBy = v; try { localStorage.setItem('o_sort', sortBy); } catch (x) {} }
+          else { gSort = v; try { localStorage.setItem('o_gsort', gSort); } catch (x) {} }
+          renderTabs(); renderView();
+          });
           function sortedTracks() {
           var L = tracks.slice();
           if (sortBy === 'az') L.sort(function (a, b) { return a.title.localeCompare(b.title); });
@@ -886,6 +1003,15 @@ jobs:
           arr.forEach(function (g) { g.art = g.tracks.filter(function (t) { return t.hasArt; })[0] || g.tracks[0]; });
           return arr;
           }
+          /* Albums / artists: most songs first (unknown groups last), or A–Z */
+          function sortGroups(arr, unknownName) {
+          return arr.sort(function (a, b) {
+          var ua = a.name === unknownName ? 1 : 0, ub = b.name === unknownName ? 1 : 0;
+          if (ua !== ub) return ua - ub;
+          if (gSort === 'count' && b.tracks.length !== a.tracks.length) return b.tracks.length - a.tracks.length;
+          return a.name.localeCompare(b.name);
+          });
+          }
           var groups = [];
           function renderView() {
           var v = $('#view'), app = $('#app');
@@ -898,19 +1024,26 @@ jobs:
           return;
           }
           app.classList.remove('searching'); updateLibInfo();
-          if (!tracks.length) { v._ctx = []; v.className = ''; v.innerHTML = emptyHtml('No songs found', 'Grant “All files access”, add audio to Music or /Music8481/Download, then reopen. Pull Rescan from Settings if needed.'); return; }
+          if (!tracks.length && tab !== 'playlists') { v._ctx = []; v.className = ''; v.innerHTML = emptyHtml('No songs found', 'Grant “All files access”, add audio to Music or /Music8481/Download, then reopen.'); return; }
           if (tab === 'songs' || tab === 'liked') {
           var L = tab === 'songs' ? sortedTracks() : tracks.filter(function (t) { return liked[t.id]; });
           v._ctx = L; v.className = 'list';
           v.innerHTML = L.length ? L.map(rowHtml).join('') : emptyHtml('Nothing liked yet', 'Tap the heart in the player to save songs here.');
           } else if (tab === 'albums') {
-          groups = groupBy(function (t) { return (t.album || 'Unknown album').toLowerCase(); }, function (t) { return t.album || 'Unknown album'; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+          groups = sortGroups(groupBy(function (t) { return (t.album || 'Unknown album').toLowerCase(); }, function (t) { return t.album || 'Unknown album'; }), 'Unknown album');
           v.className = 'grid2';
           v.innerHTML = groups.map(function (g, i) { return '<div class="gcard" data-g="' + i + '"><div class="art gart" style="background:' + thumbBg(g.art) + '">' + artInner(g.art) + '</div><b>' + esc(g.name) + '</b><span>' + g.tracks.length + ' song' + (g.tracks.length === 1 ? '' : 's') + ' · ' + esc(g.tracks[0].pa) + '</span></div>'; }).join('');
           } else if (tab === 'artists') {
-          groups = groupBy(function (t) { return t.pa.toLowerCase(); }, function (t) { return t.pa; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+          groups = sortGroups(groupBy(function (t) { return t.pa.toLowerCase(); }, function (t) { return t.pa; }), 'Unknown Artist');
           v.className = 'list';
           v.innerHTML = groups.map(function (g, i) { return '<div class="arow" data-g="' + i + '"><div class="art" style="background:' + avBg(g.name) + '"><span>' + esc(initial(g.name)) + '</span></div><div class="rt"><b>' + esc(g.name) + '</b><span>' + g.tracks.length + ' song' + (g.tracks.length === 1 ? '' : 's') + '</span></div></div>'; }).join('');
+          } else if (tab === 'playlists') {
+          var P = plList(); v.className = 'list';
+          v.innerHTML = '<button class="hbtn g pl-new" id="plNew">' + IC.plus(20) + ' New playlist</button>' + (P.length ? P.map(function (p) {
+          var T = plTracks(p.k), art = T.filter(function (t) { return t.hasArt; })[0];
+          var ic = art ? '<div class="art plart" style="background:' + thumbBg(art) + '">' + artInner(art) + '</div>' : '<div class="fld">' + IC.note(26) + '</div>';
+          return '<div class="arow" data-pl="' + p.k + '">' + ic + '<div class="rt"><b>' + esc(p.name) + '</b><span>' + T.length + ' song' + (T.length === 1 ? '' : 's') + '</span></div></div>';
+          }).join('') : emptyHtml('No playlists yet', 'Create one, then use ⋮ on any song → Add to playlist.'));
           } else if (tab === 'folders') {
           groups = groupBy(function (t) { return t.folder || 'Device'; }, function (t) { return t.folder || 'Device'; }).sort(function (a, b) { return b.tracks.length - a.tracks.length; });
           v.className = 'list';
@@ -922,6 +1055,8 @@ jobs:
           }
           $('#view').addEventListener('click', function (e) {
           var mo = e.target.closest('[data-more]'); if (mo) { e.stopPropagation(); openSheet(tracks[+mo.getAttribute('data-more')]); return; }
+          if (e.target.closest('#plNew')) { newPlaylistFlow(null); return; }
+          var pl = e.target.closest('[data-pl]'); if (pl) { openPlaylist(pl.getAttribute('data-pl')); return; }
           var r = e.target.closest('.row'); if (r) { startQueue($('#view')._ctx || tracks, +r.getAttribute('data-i')); return; }
           var g = e.target.closest('[data-g]'); if (g) openDetail(groups[+g.getAttribute('data-g')], tab);
           });
@@ -933,37 +1068,69 @@ jobs:
           $('#search').addEventListener('input', function (e) { searchQ = e.target.value.trim(); $('#sClr').classList.toggle('hide', !searchQ); renderView(); });
           $('#sClr').onclick = function () { $('#search').value = ''; searchQ = ''; $('#sClr').classList.add('hide'); renderView(); };
 
-          /* ---------- detail overlay (artist = first-letter avatar, no song banner) ---------- */
-          var detailTracks = [];
-          function openDetail(g, kind) {
-          if (!g) return; detailTracks = g.tracks.slice(); var h = hueOf(g.name), isArtist = kind === 'artists';
+          /* ---------- detail overlay (album / artist / folder / playlist) ---------- */
+          var detailTracks = [], detailG = null, plDelArm = false;
+          function openDetail(g, kind, keep) {
+          if (!g) return; detailTracks = g.tracks.slice(); plDelArm = false;
+          detailG = { kind: kind, name: g.name, ids: detailTracks.map(function (t) { return t.id; }), plId: g.plId };
+          var h = hueOf(g.name), isArtist = kind === 'artists', isPl = kind === 'playlists';
           var dur = 0; detailTracks.forEach(function (t) { dur += t.dur || 0; });
-          $('#dKind').textContent = kind === 'albums' ? 'Album' : isArtist ? 'Artist' : 'Folder';
+          $('#dKind').textContent = kind === 'albums' ? 'Album' : isArtist ? 'Artist' : isPl ? 'Playlist' : 'Folder';
           var artHtml = isArtist
           ? '<div class="art d-art avatar" style="background:' + avBg(g.name) + '"><span>' + esc(initial(g.name)) + '</span></div>'
+          : isPl
+          ? (g.art && g.art.hasArt ? '<div class="art d-art" style="background:' + thumbBg(g.art) + '">' + artInner(g.art) + '</div>' : '<div class="art d-art" style="background:linear-gradient(135deg,hsl(' + h + ',45%,32%),hsl(' + ((h + 50) % 360) + ',45%,20%))">' + IC.note(80) + '</div>')
           : '<div class="art d-art" style="background:' + thumbBg(g.art) + '">' + (kind === 'folders' ? IC.folder(72) : artInner(g.art)) + '</div>';
-          $('#dHead').innerHTML = '<div class="d-bg" style="background:linear-gradient(180deg,hsl(' + h + ',55%,30%),var(--bg) 85%)"></div>' + artHtml + '<h2>' + esc(kind === 'folders' ? g.name.split('/').slice(-1)[0] : g.name) + '</h2><p>' + g.tracks.length + ' songs' + (dur ? ' · ' + fmtLong(dur) : '') + '</p><div class="d-acts"><button class="hbtn g" id="dPlay">' + IC.play(18) + ' Play</button><button class="hbtn v" id="dShuf">' + IC.shuffle(18) + ' Shuffle</button></div>';
+          $('#dHead').innerHTML = '<div class="d-bg" style="background:linear-gradient(180deg,hsl(' + h + ',50%,24%),var(--bg) 85%)"></div>' + artHtml + '<h2>' + esc(kind === 'folders' ? g.name.split('/').slice(-1)[0] : g.name) + '</h2><p>' + detailTracks.length + ' songs' + (dur ? ' · ' + fmtLong(dur) : '') + '</p><div class="d-acts"><button class="hbtn g" id="dPlay">' + IC.play(18) + ' Play</button><button class="hbtn v" id="dShuf">' + IC.shuffle(18) + ' Shuffle</button></div>' + (isPl ? '<div class="d-acts d-acts2"><button class="hbtn x" id="dRen">Rename</button><button class="hbtn x danger" id="dDel">Delete playlist</button></div>' : '');
           var L = $('#dList'); L._ctx = detailTracks; L.className = 'list';
-          L.innerHTML = detailTracks.map(rowHtml).join('');
-          $('#dPlay').onclick = function () { setShuffle(false); startQueue(detailTracks, detailTracks[0].i); };
-          $('#dShuf').onclick = function () { setShuffle(true); startQueue(detailTracks, detailTracks[Math.floor(Math.random() * detailTracks.length)].i); };
-          $('#detail').scrollTop = 0; $('#detail').classList.add('open'); pushOv('detail');
+          L.innerHTML = detailTracks.length ? detailTracks.map(rowHtml).join('') : emptyHtml(isPl ? 'Playlist is empty' : 'No songs', 'Use ⋮ on any song → Add to playlist.');
+          $('#dPlay').onclick = function () { if (!detailTracks.length) { toast('Nothing to play'); return; } setShuffle(false); startQueue(detailTracks, detailTracks[0].i); };
+          $('#dShuf').onclick = function () { if (!detailTracks.length) { toast('Nothing to play'); return; } setShuffle(true); startQueue(detailTracks, detailTracks[Math.floor(Math.random() * detailTracks.length)].i); };
+          if (isPl) {
+          $('#dRen').onclick = function () { var p = playlists[detailG.plId]; if (!p) return; askName('Rename playlist', p.name, 'Save', function (n) { p.name = n; p.updated = Date.now(); savePl(); refreshDetail(); }); };
+          $('#dDel').onclick = function () {
+          var b = $('#dDel'); if (!plDelArm) { plDelArm = true; b.textContent = 'Tap again to delete'; return; }
+          var nm = playlists[detailG.plId] ? playlists[detailG.plId].name : ''; delete playlists[detailG.plId]; savePl(); closeOv('detail'); toast('Deleted “' + nm + '”');
+          };
+          }
+          if (!keep) $('#detail').scrollTop = 0; $('#detail').classList.add('open'); pushOv('detail');
+          }
+          /* Rebuilds the open detail page from the current library (after deletes / playlist edits) */
+          function refreshDetail() {
+          if (!detailG || ov.indexOf('detail') < 0) return;
+          var T, name = detailG.name;
+          if (detailG.kind === 'playlists') { var p = playlists[detailG.plId]; if (!p) { closeOv('detail'); return; } T = plTracks(detailG.plId); name = p.name; }
+          else { T = detailG.ids.map(function (id) { return idMap[id]; }).filter(Boolean); if (!T.length) { closeOv('detail'); return; } }
+          var sc = $('#detail').scrollTop, kind = detailG.kind, plId = detailG.plId;
+          openDetail({ name: name, tracks: T, plId: plId, art: T.filter(function (t) { return t.hasArt; })[0] || T[0] }, kind, true);
+          $('#detail').scrollTop = sc;
           }
           $('#dList').addEventListener('click', function (e) {
-          var mo = e.target.closest('[data-more]'); if (mo) { e.stopPropagation(); openSheet(tracks[+mo.getAttribute('data-more')]); return; }
+          var mo = e.target.closest('[data-more]'); if (mo) { e.stopPropagation(); openSheet(tracks[+mo.getAttribute('data-more')], detailG && detailG.kind === 'playlists' ? detailG.plId : null); return; }
           var r = e.target.closest('.row'); if (r) startQueue($('#dList')._ctx || tracks, +r.getAttribute('data-i'));
           });
           $('#dBack').innerHTML = IC.back(24); $('#dBack').onclick = function () { closeOv('detail'); };
 
-          /* ---------- row action sheet (now has X + Close button) ---------- */
-          var sheetT = null, delArm = false;
-          function openSheet(t) {
-          if (!t) return; sheetT = t; delArm = false; drawSheet(); $('#shBack').classList.add('open'); pushOv('sheet');
+          /* ---------- row action sheet ---------- */
+          var sheetT = null, delArm = false, sheetMode = 'main', sheetPl = null;
+          function openSheet(t, plk) {
+          if (!t) return; sheetT = t; delArm = false; sheetMode = 'main'; sheetPl = plk || null; drawSheet(); $('#shBack').classList.add('open'); pushOv('sheet');
           }
           function drawSheet() {
           var t = sheetT; if (!t) return;
-          $('#shBox').innerHTML = '<div class="sh-grab"><i></i></div><div class="sh-head"><div class="art" style="background:' + thumbBg(t) + '">' + artInner(t) + '</div><div class="sh-t"><b>' + esc(t.title) + '</b><span>' + esc(t.artist) + (t.album ? ' · ' + esc(t.album) : '') + '</span></div><button class="sh-x" data-a="close" aria-label="Close">' + IC.close(18) + '</button></div>' +
+          var head = '<div class="sh-grab"><i></i></div><div class="sh-head"><div class="art" style="background:' + thumbBg(t) + '">' + artInner(t) + '</div><div class="sh-t"><b>' + esc(t.title) + '</b><span>' + esc(t.artist) + (t.album ? ' · ' + esc(t.album) : '') + '</span></div><button class="sh-x" data-a="close" aria-label="Close">' + IC.close(18) + '</button></div>';
+          if (sheetMode === 'pl') {
+          var P = plList();
+          $('#shBox').innerHTML = head + '<button class="sh-act" data-a="plnew">' + IC.plus(22) + 'New playlist</button>' + P.map(function (p) {
+          var has = p.ids.indexOf(t.id) >= 0;
+          return '<button class="sh-act" data-pl="' + p.k + '">' + IC.note(22) + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.name) + '</span><small style="color:rgba(255,255,255,.45);font-weight:700">' + (has ? 'Added' : plTracks(p.k).length + ' songs') + '</small></button>';
+          }).join('') + '<button class="sh-act cancel" data-a="back">Back</button>';
+          return;
+          }
+          $('#shBox').innerHTML = head +
           '<button class="sh-act" data-a="next">' + IC.qnext(22) + 'Play next</button><button class="sh-act" data-a="add">' + IC.qadd(22) + 'Add to queue</button>' +
+          '<button class="sh-act" data-a="addpl">' + IC.note(22) + 'Add to playlist</button>' +
+          (sheetPl && playlists[sheetPl] ? '<button class="sh-act" data-a="rmpl">' + IC.close(22) + 'Remove from this playlist</button>' : '') +
           '<button class="sh-act" data-a="like">' + IC.heart(22, !!liked[t.id]) + (liked[t.id] ? 'Remove from liked' : 'Add to liked') + '</button>' +
           (t.album ? '<button class="sh-act" data-a="album">' + IC.disc(22) + 'Go to album</button>' : '') + (t.pa !== 'Unknown Artist' ? '<button class="sh-act" data-a="artist">' + IC.user(22) + 'Go to artist</button>' : '') +
           '<button class="sh-act danger" data-a="del">' + IC.trash(22) + (delArm ? 'Tap again to delete from device' : 'Delete from device') + '</button>' +
@@ -971,15 +1138,53 @@ jobs:
           }
           $('#shBack').addEventListener('click', function (e) {
           if (e.target === $('#shBack')) { closeOv('sheet'); return; }
-          var b = e.target.closest('[data-a]'); if (!b || !sheetT) return; var a = b.getAttribute('data-a'), t = sheetT;
+          var t = sheetT; if (!t) return;
+          var pb = e.target.closest('[data-pl]');
+          if (pb && sheetMode === 'pl') {
+          var pk = pb.getAttribute('data-pl'), pn = playlists[pk] ? playlists[pk].name : '';
+          var ok = addToPlaylist(pk, t.id); closeOv('sheet'); toast(ok ? 'Added to “' + pn + '”' : 'Already in “' + pn + '”'); return;
+          }
+          var b = e.target.closest('[data-a]'); if (!b) return; var a = b.getAttribute('data-a');
           if (a === 'close') { closeOv('sheet'); return; }
-          if (a === 'del') { if (!delArm) { delArm = true; drawSheet(); return; } try { A && A.deleteDownloadedFile && A.deleteDownloadedFile(t.id); } catch (x) {} closeOv('sheet'); toast('Deleted ' + t.title); setTimeout(loadTracks, 250); return; }
+          if (a === 'addpl') { sheetMode = 'pl'; drawSheet(); return; }
+          if (a === 'back') { sheetMode = 'main'; drawSheet(); return; }
+          if (a === 'plnew') { closeOv('sheet'); setTimeout(function () { newPlaylistFlow(t.id); }, 80); return; }
+          if (a === 'rmpl') {
+          var rk = sheetPl, rp = playlists[rk]; closeOv('sheet');
+          if (rp) { rp.ids = rp.ids.filter(function (x) { return x !== t.id; }); rp.updated = Date.now(); savePl(); refreshDetail(); toast('Removed from “' + rp.name + '”'); }
+          return;
+          }
+          if (a === 'del') {
+          if (!delArm) { delArm = true; drawSheet(); return; }
+          var wasCur = cur() === t, ok2 = false;
+          try { ok2 = !!(A && A.deleteDownloadedFile && A.deleteDownloadedFile(t.id)); } catch (x) {}
+          closeOv('sheet');
+          if (!ok2) { toast('Could not delete — allow “All files access”'); return; }
+          afterDelete(t, wasCur); return;
+          }
           closeOv('sheet');
           if (a === 'next') queueNext(t); else if (a === 'add') queueAdd(t);
           else if (a === 'like') { if (liked[t.id]) delete liked[t.id]; else liked[t.id] = 1; saveLiked(); toast(liked[t.id] ? 'Added to liked' : 'Removed from liked'); }
           else if (a === 'album') { var g = groupBy(function (x) { return (x.album || 'Unknown album').toLowerCase(); }, function (x) { return x.album || 'Unknown album'; }).filter(function (x) { return x.key === (t.album || 'Unknown album').toLowerCase(); })[0]; setTimeout(function () { openDetail(g, 'albums'); }, 120); }
           else if (a === 'artist') { var g2 = groupBy(function (x) { return x.pa.toLowerCase(); }, function (x) { return x.pa; }).filter(function (x) { return x.key === t.pa.toLowerCase(); })[0]; setTimeout(function () { openDetail(g2, 'artists'); }, 120); }
           });
+          /* Delete: clean every reference, stop playback if needed, then refresh the list from disk immediately (and once more to be sure) */
+          function afterDelete(t, wasCur) {
+          var id = t.id;
+          delete ixCache[id]; ixDirty = true; saveIx(); delete palCache[id];
+          if (liked[id]) { delete liked[id]; try { localStorage.setItem('o_liked', JSON.stringify(liked)); } catch (e) {} }
+          Object.keys(playlists).forEach(function (k) { playlists[k].ids = playlists[k].ids.filter(function (x) { return x !== id; }); });
+          try { localStorage.setItem('o_pl', JSON.stringify(playlists)); } catch (e) {}
+          try { var l = JSON.parse(localStorage.getItem('o_last') || 'null'); if (l && l.id === id) localStorage.removeItem('o_last'); } catch (e) {}
+          if (wasCur) {
+          try { aud.pause(); aud.removeAttribute('src'); aud.load(); } catch (e) {}
+          nativeClear(); lastNativeId = ''; $('#mini').style.display = 'none';
+          if (playerOpen) closeOv('player'); if (queueOpen) closeOv('queue');
+          }
+          toast('Deleted ' + t.title);
+          loadTracks(); refreshDetail(); saveQueue();
+          setTimeout(function () { loadTracks(); refreshDetail(); }, 500);
+          }
           function saveLiked() { try { localStorage.setItem('o_liked', JSON.stringify(liked)); } catch (e) {} renderHearts(); renderTabs(); }
           function queueNext(t) {
           if (pos < 0) { startQueue([t], t.i); return; }
@@ -990,12 +1195,14 @@ jobs:
           order.push(t.i); baseOrder.push(t.i); toast('Added to queue'); if (queueOpen) renderQueue(true); saveQueue();
           }
 
-          /* ================= queue model ================= */
+          /* ================= queue model =================
+             Playing song #15 of 40 → queue = 16…40 followed by 1…14 (everything stays in the queue). */
           function startQueue(list, ti) {
-          baseOrder = list.map(function (t) { return t.i; }); order = baseOrder.slice(); pos = order.indexOf(ti);
-          if (pos < 0) { order = tracks.map(function (t) { return t.i; }); baseOrder = order.slice(); pos = ti; }
+          var ids = list.map(function (t) { return t.i; }), ix = ids.indexOf(ti);
+          if (ix < 0) { ids = tracks.map(function (t) { return t.i; }); ix = ids.indexOf(ti); if (ix < 0) ix = 0; }
+          baseOrder = rot(ids, ix); order = baseOrder.slice(); pos = 0;
           if (shuffle) shuffleRest();
-          playAt(pos, true); saveQueue();
+          playAt(0, true); saveQueue();
           }
           function shuffleRest() {
           var head = order.slice(0, pos + 1), rest = order.slice(pos + 1);
@@ -1005,7 +1212,7 @@ jobs:
           function setShuffle(v) {
           if (v === shuffle) return; shuffle = v;
           if (shuffle) shuffleRest();
-          else { var c = cur(); if (c) { var b = baseOrder.slice(); var ix = b.indexOf(c.i); if (ix >= 0) { order = b; pos = ix; } } }
+          else { var c = cur(); if (c) { var ix = baseOrder.indexOf(c.i); if (ix >= 0) { order = rot(baseOrder, ix); pos = 0; } } }
           updateModeUI(); if (queueOpen) renderQueue(true); saveQueue();
           }
           function setRepeat(v) { repeat = v; updateModeUI(); }
@@ -1073,7 +1280,7 @@ jobs:
           }
           if (pos < 0) {
           var l = JSON.parse(localStorage.getItem('o_last') || 'null'); if (!l || !idMap[l.id]) return;
-          baseOrder = tracks.map(function (t) { return t.i; }); order = baseOrder.slice(); pos = idMap[l.id].i;
+          baseOrder = rot(tracks.map(function (t) { return t.i; }), idMap[l.id].i); order = baseOrder.slice(); pos = 0;
           }
           var t = cur(); ensureFull(t); recoverTries = 0; aud.src = t.url; var ts = parseFloat(localStorage.getItem('o_time') || '0'); if (ts > 0) pendingSeek = ts;
           setTrackUI(t); $('#mini').style.display = 'block'; renderContinue();
@@ -1101,26 +1308,28 @@ jobs:
           function toggleLike(e) { e.stopPropagation(); var t = cur(); if (!t) return; if (liked[t.id]) delete liked[t.id]; else liked[t.id] = 1; saveLiked(); }
           $('#pHeart').onclick = toggleLike; $('#mHeart').onclick = toggleLike;
 
-          function tileHtml(icon, label, val, color, wide) { return '<div class="tile2' + (wide ? ' wide' : '') + '"><div class="ti" style="background:' + color + '22;color:' + color + '">' + icon + '</div><div><div class="tl">' + esc(label) + '</div><div class="tv">' + esc(val) + '</div></div></div>'; }
+          /* "About this track" colours come ONLY from the palette extracted from the cover art (dark, rich tones) */
+          function tileHtml(icon, label, val, color, wide) { return '<div class="tile2' + (wide ? ' wide' : '') + '"><div class="ti" style="background:rgba(0,0,0,.28);color:' + color + '">' + icon + '</div><div><div class="tl">' + esc(label) + '</div><div class="tv">' + esc(val) + '</div></div></div>'; }
           function renderDetails(t) {
           $('#aHead').innerHTML = IC.spark(17) + ' About this track'; $('#aHead').firstChild.style.color = 'var(--accent)';
           $('#aSub').textContent = t.title;
+          var P = palette || DEFAULT_PAL, c1 = P.accent, c2 = hs(P.h + 18, P.sat, .54), c3 = hs(P.h - 18, P.sat, .54);
           var g = '', dur = t.dur || (aud.duration && isFinite(aud.duration) ? aud.duration : 0), q = qualityOf(t);
-          if (dur) g += tileHtml(IC.clock(17), 'Duration', fmt(dur), '#8cc2ff');
-          g += tileHtml(IC.file(17), 'File size', mb(t.size) + ' MB', '#fcd462');
-          g += tileHtml(IC.gauge(17), 'Quality', q.label, '#5df08f', true);
-          if (t.artist && t.artist !== 'Unknown Artist') g += tileHtml(IC.user(17), 'Artist', t.artist, '#c4b5fd', true);
-          if (t.album) g += tileHtml(IC.disc(17), 'Album', t.album, '#fdba74', true);
-          g += tileHtml(IC.cal(17), 'Added', new Date(t.lastModified).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), '#8cc2ff');
-          if (t.year) g += tileHtml(IC.cal(17), 'Year', String(t.year).slice(0, 4), '#fcd462');
-          g += tileHtml(IC.folder(17), 'Location', '/' + (t.folder || ''), '#5df08f', true);
+          if (dur) g += tileHtml(IC.clock(17), 'Duration', fmt(dur), c1);
+          g += tileHtml(IC.file(17), 'File size', mb(t.size) + ' MB', c2);
+          g += tileHtml(IC.gauge(17), 'Quality', q.label, c3, true);
+          if (t.artist && t.artist !== 'Unknown Artist') g += tileHtml(IC.user(17), 'Artist', t.artist, c1, true);
+          if (t.album) g += tileHtml(IC.disc(17), 'Album', t.album, c2, true);
+          g += tileHtml(IC.cal(17), 'Added', new Date(t.lastModified).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), c3);
+          if (t.year) g += tileHtml(IC.cal(17), 'Year', String(t.year).slice(0, 4), c1);
+          g += tileHtml(IC.folder(17), 'Location', '/' + (t.folder || ''), c2, true);
           $('#aGrid').innerHTML = g;
           var chips = ''; if (t.genre) chips += '<span class="chip">' + IC.tag(11) + esc(t.genre) + '</span>';
           if (t.isDownload) chips += '<span class="chip">Downloaded</span>'; if (t.hasLyrics) chips += '<span class="chip">LRC lyrics</span>'; if (q.lossless) chips += '<span class="chip">Lossless</span>';
           $('#aChips').innerHTML = chips;
           }
 
-          /* ================= lyrics (mini + card in perfect sync, Spotify-style music note for instrumental parts) ================= */
+          /* ================= lyrics (mini + card in perfect sync) ================= */
           var NOTE = IC.lyrnote(24), NOTE_HTML = '<span class="inst-ic">' + NOTE + '</span>';
           function parseLrc(text) {
           if (!text) return []; text = text.replace(/^\uFEFF/, '');
@@ -1246,7 +1455,14 @@ jobs:
           if (sec !== lastSec) { lastSec = sec; if (playerOpen && !seeking) $$('.js-cur').forEach(function (e) { e.textContent = fmt(c); }); var now = Date.now(); if (now - lastSave > 3000) { lastSave = now; saveTime(); } }
           if (lines.length && settings.lyr) { var idx = findActiveIdx(c + .4); if (idx !== activeIdx) setActive(idx); applyWords(c); }
           }
-          function loop() { raf = 0; if (aud.paused) return; update(); raf = requestAnimationFrame(loop); }
+          /* UI loop only runs while the screen is visible → no wasted CPU in background (prevents audio crackle) */
+          function loop() { raf = 0; if (aud.paused || document.hidden) return; update(); raf = requestAnimationFrame(loop); }
+          document.addEventListener('visibilitychange', function () {
+          if (document.hidden) { saveTime(); return; }
+          checkNet(); stallCnt = 0; lastCT = aud.currentTime; update();
+          if (!aud.paused && !raf) raf = requestAnimationFrame(loop);
+          if (loaded && !tracks.length) loadTracks(); else softRescan();
+          });
           function setPlayUI() {
           var p = !aud.paused;
           $$('.js-play').forEach(function (b) { b.innerHTML = p ? IC.pause(b.id === 'bPlay' ? 28 : 26) : IC.play(b.id === 'bPlay' ? 30 : 26); });
@@ -1255,6 +1471,8 @@ jobs:
           var cp = $('#contPlay'); if (cp) cp.innerHTML = p ? IC.pause(22) : IC.play(22);
           }
           aud.addEventListener('play', function () { setPlayUI(); renderContinue(); nativeState(); if (!raf) raf = requestAnimationFrame(loop); });
+          /* Re-sync the notification every time playback actually starts (Android 16 could keep the old song's details) */
+          aud.addEventListener('playing', function () { var t = cur(); if (t && lastNativeId !== t.id) nativeUpdate(t); });
           aud.addEventListener('pause', function () { setPlayUI(); renderContinue(); nativeState(); update(); saveTime(); });
           aud.addEventListener('timeupdate', function () { if (aud.paused) update(); });
           aud.addEventListener('seeked', function () { update(); nativeState(); });
@@ -1265,15 +1483,17 @@ jobs:
           var t = cur(); if (t) { if (!t.dur) { t.dur = d; renderDetails(t); } nativeUpdate(t); }
           });
           aud.addEventListener('error', function () {
-          if (cur() && recoverTries < 3) { recover(!aud.paused || aud.currentTime > 0 ? true : false); return; }
+          if (!cur()) return;
+          if (recoverTries < 3) { recover(!aud.paused || aud.currentTime > 0 ? true : false); return; }
           errCount++; toast('Can’t play this file'); if (errCount < 3 && order.length > 1) setTimeout(function () { next(false); }, 600);
           });
-          /* stall watchdog: if audio should be playing but time is frozen for ~5s, rebuild the source at the same position */
+          /* stall watchdog (screen on only): if audio should be playing but time is frozen for ~5s, rebuild the source at the same position.
+             Skipped while the app is in background because throttled timers caused false "stalls" → audible crackle. */
           setInterval(function () {
-          if (aud.paused || !cur() || aud.ended) { stallCnt = 0; lastCT = aud.currentTime; return; }
+          if (document.hidden || aud.paused || !cur() || aud.ended) { stallCnt = 0; lastCT = aud.currentTime; return; }
           if (Math.abs(aud.currentTime - lastCT) < 0.01) stallCnt++; else { stallCnt = 0; if (aud.currentTime > 3) recoverTries = 0; }
           lastCT = aud.currentTime;
-          if (stallCnt >= 5) { stallCnt = 0; recover(true); }
+          if (stallCnt >= 6) { stallCnt = 0; recover(true); }
           }, 1000);
 
           $$('.js-seek').forEach(function (s) {
@@ -1288,6 +1508,7 @@ jobs:
           /* ================= native notification bridge ================= */
           function nativeUpdate(t) {
           if (!t) return;
+          lastNativeId = t.id;
           try {
           if (A && A.mediaUpdate) A.mediaUpdate(t.title, t.artist, t.album || '', t.id, Math.round((aud.duration && isFinite(aud.duration) ? aud.duration : t.dur || 0) * 1000), !aud.paused, Math.round(aud.currentTime * 1000));
           else if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, album: t.album || 'Music8481', artwork: t.hasArt ? [{ src: t.artUrl, sizes: '512x512', type: 'image/jpeg' }] : [] }); }
@@ -1477,7 +1698,6 @@ jobs:
           applyFonts(); syncSettingsUI();
 
           /* ================= boot ================= */
-          document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { checkNet(); if (loaded && !tracks.length) loadTracks(); } });
           applyPalette(DEFAULT_PAL); checkNet(); renderTabs(); renderView();
           setTimeout(loadTracks, 150);
           })();
@@ -1485,13 +1705,13 @@ jobs:
           </body>
           </html>
           EOF
-          
-          npx cap init Music8481 com.music8481.app --web-dir www
+
+          npx cap init Music8481 com.ayush.music --web-dir www
 
           rm capacitor.config.ts || true
-          cat <<EOF > capacitor.config.json
+          cat <<'EOF' > capacitor.config.json
           {
-            "appId": "com.music8481.app",
+            "appId": "com.ayush.music",
             "appName": "Music8481",
             "webDir": "www",
             "server": {
@@ -1515,62 +1735,65 @@ jobs:
       - name: Add Native Android Platform
         run: npx cap add android
 
-      - name: Inject Permissions & Root Folder Access Meta-Data
+      - name: Inject Permissions, Service & Root Folder Access Meta-Data
         run: |
-          node -e "
+          cat <<'EOF' > patch-manifest.js
           const fs = require('fs');
           const path = 'android/app/src/main/AndroidManifest.xml';
           let xml = fs.readFileSync(path, 'utf8');
-          const perms = \`
-              <uses-permission android:name=\"android.permission.INTERNET\" />
-              <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />
-              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />
-              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\" />
-              <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />
-              <uses-permission android:name=\"android.permission.WAKE_LOCK\" />
-              <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />
-              <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />
-              <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />
-              <uses-permission android:name=\"android.permission.READ_MEDIA_AUDIO\" />
-              <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" />
-              <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" />
-          \`;
+          const perms = `
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+          `;
           if (!xml.includes('android.permission.WAKE_LOCK')) {
-              xml = xml.replace('<application', perms + '\n    <application');
-              xml = xml.replace('<application', '<application android:hardwareAccelerated=\"true\" android:largeHeap=\"true\" android:usesCleartextTraffic=\"true\" android:requestLegacyExternalStorage=\"true\" android:preserveLegacyExternalStorage=\"true\"');
-              xml = xml.replace('<activity', '<activity android:hardwareAccelerated=\"true\" android:supportsPictureInPicture=\"true\"');
-              fs.writeFileSync(path, xml);
+            xml = xml.replace('<application', perms + '\n    <application android:hardwareAccelerated="true" android:largeHeap="true" android:usesCleartextTraffic="true" android:requestLegacyExternalStorage="true" android:preserveLegacyExternalStorage="true" android:resizeableActivity="true"');
+            xml = xml.replace('<activity', '<activity android:hardwareAccelerated="true" android:supportsPictureInPicture="true"');
+            xml = xml.replace('</application>', '    <service android:name=".MusicService" android:exported="false" android:foregroundServiceType="mediaPlayback" />\n    </application>');
+            fs.writeFileSync(path, xml);
           }
-          "
+          EOF
+          node patch-manifest.js
 
       - name: Force Android App Theme to Edge-to-Edge
         run: |
-          node -e "
+          cat <<'EOF' > patch-styles.js
           const fs = require('fs');
           const path = 'android/app/src/main/res/values/styles.xml';
           if (fs.existsSync(path)) {
-              let xml = fs.readFileSync(path, 'utf8');
-              const edgeToEdge = \`
-                  <item name=\"android:windowLayoutInDisplayCutoutMode\">shortEdges</item>
-                  <item name=\"android:windowTranslucentStatus\">true</item>
-                  <item name=\"android:windowTranslucentNavigation\">true</item>
-                  <item name=\"android:statusBarColor\">@android:color/transparent</item>
-                  <item name=\"android:navigationBarColor\">@android:color/transparent</item>
-                  <item name=\"android:windowDrawsSystemBarBackgrounds\">false</item>
-                  <item name=\"android:windowFullscreen\">true</item>
-                  <item name=\"android:windowContentOverlay\">@null</item>
-              \`;
-              xml = xml.replace(/<\/style>/g, edgeToEdge + '\n</style>');
-              fs.writeFileSync(path, xml);
+            let xml = fs.readFileSync(path, 'utf8');
+            const edgeToEdge = `
+              <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+              <item name="android:windowTranslucentStatus">true</item>
+              <item name="android:windowTranslucentNavigation">true</item>
+              <item name="android:statusBarColor">@android:color/transparent</item>
+              <item name="android:navigationBarColor">@android:color/transparent</item>
+              <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+              <item name="android:windowFullscreen">true</item>
+              <item name="android:windowContentOverlay">@null</item>
+          `;
+            xml = xml.replace(/<\/style>/g, edgeToEdge + '\n</style>');
+            fs.writeFileSync(path, xml);
           }
-          "
+          EOF
+          node patch-styles.js
 
-      - name: Inject Custom Download Engine + Offline Scanner + Native Media Notification
+      - name: Inject Custom Download Engine + Offline Scanner + Native Media Notification (package com.ayush.music)
         run: |
-          cat <<'EOF' > android/app/src/main/java/com/music8481/app/MainActivity.java
-          package com.music8481.app;
+          mkdir -p android/app/src/main/java/com/ayush/music
+          cat <<'EOF' > android/app/src/main/java/com/ayush/music/MainActivity.java
+          package com.ayush.music;
 
           import android.Manifest;
           import android.app.Notification;
@@ -1663,33 +1886,37 @@ jobs:
           import java.util.concurrent.atomic.AtomicInteger;
 
           public class MainActivity extends BridgeActivity {
+              static MainActivity INSTANCE;
+
               private PowerManager.WakeLock wakeLock;
               private boolean isVideoFullscreen = false;
               private boolean isVideoModeActive = false;
               private String pendingDownloadFilename = null;
               private boolean initialRouteHandled = false;
               private boolean chromeInstalled = false;
+              private Bitmap transparentPoster = null;
 
               private static final String ONLINE_HOST = "ayushmobileappmusicgaaana.vercel.app";
               private static final String OFFLINE_PAGE = "file:///android_asset/public/error.html";
 
               private static final String CHANNEL_ID = "music8481_download_channel";
-              private static final String ACTION_PAUSE = "com.music8481.app.ACTION_PAUSE";
-              private static final String ACTION_RESUME = "com.music8481.app.ACTION_RESUME";
-              private static final String ACTION_CANCEL = "com.music8481.app.ACTION_CANCEL";
+              private static final String ACTION_PAUSE = "com.ayush.music.ACTION_PAUSE";
+              private static final String ACTION_RESUME = "com.ayush.music.ACTION_RESUME";
+              private static final String ACTION_CANCEL = "com.ayush.music.ACTION_CANCEL";
 
               // ---- Native media notification (offline player) ----
-              private static final String PB_CHANNEL = "music8481_playback_channel";
-              private static final int PB_NOTI_ID = 7001;
-              private static final String ACT_M_PREV = "com.music8481.app.M_PREV";
-              private static final String ACT_M_TOGGLE = "com.music8481.app.M_TOGGLE";
-              private static final String ACT_M_NEXT = "com.music8481.app.M_NEXT";
+              static final String PB_CHANNEL = "music8481_playback_channel";
+              static final int PB_NOTI_ID = 7001;
+              private static final String ACT_M_PREV = "com.ayush.music.M_PREV";
+              private static final String ACT_M_TOGGLE = "com.ayush.music.M_TOGGLE";
+              private static final String ACT_M_NEXT = "com.ayush.music.M_NEXT";
               private MediaSession mediaSession;
-              private String mTitle = "", mArtist = "", mAlbum = "", mRel = "";
-              private long mDur = 0, mPos = 0;
-              private boolean mPlaying = false;
-              private Bitmap mArt = null;
+              private volatile String mTitle = "", mArtist = "", mAlbum = "", mRel = "";
+              private volatile long mDur = 0, mPos = 0;
+              private volatile boolean mPlaying = false;
+              private volatile Bitmap mArt = null;
               private volatile int indexGen = 0;
+              private boolean serviceUp = false;
 
               private NotificationManager notificationManager;
               private final AtomicInteger notificationIdCounter = new AtomicInteger(2000);
@@ -1698,10 +1925,11 @@ jobs:
               private LocalServer localServer;
 
               // =========================================================================
-              // 🔥 LOCAL MEDIA SERVER (127.0.0.1, random port + secret token)
-              //    Full HTTP/1.1 Range support → seeking / long songs / resume never stall.
-              //      /<token>/f/<relative path>        → audio file
-              //      /<token>/__art__/<relative path>  → embedded cover art
+              // LOCAL MEDIA SERVER (127.0.0.1, random port + secret token)
+              //   Full HTTP/1.1 Range support, big buffers + audio-priority threads so
+              //   background playback never underruns (= no crackling).
+              //     /<token>/f/<relative path>        -> audio file
+              //     /<token>/__art__/<relative path>  -> embedded cover art
               // =========================================================================
               private class LocalServer {
                   private ServerSocket serverSocket;
@@ -1718,6 +1946,7 @@ jobs:
                           running = true;
                           pool = Executors.newCachedThreadPool();
                           Thread t = new Thread(() -> {
+                              try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO); } catch (Exception ignored) {}
                               while (running) {
                                   try {
                                       final Socket s = serverSocket.accept();
@@ -1787,10 +2016,12 @@ jobs:
 
                   private void handle(Socket s) {
                       try {
+                          try { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO); } catch (Exception ignored) {}
                           s.setSoTimeout(20000);
                           s.setTcpNoDelay(true);
+                          try { s.setSendBufferSize(262144); } catch (Exception ignored) {}
                           InputStream in = new BufferedInputStream(s.getInputStream(), 4096);
-                          OutputStream out = new BufferedOutputStream(s.getOutputStream(), 65536);
+                          OutputStream out = new BufferedOutputStream(s.getOutputStream(), 131072);
 
                           String reqLine = readLine(in);
                           if (reqLine == null || reqLine.isEmpty()) return;
@@ -1841,7 +2072,7 @@ jobs:
                               out.flush();
                           }
                       } catch (Exception ignored) {
-                          // client closed the connection (seek / skip) — totally normal
+                          // client closed the connection (seek / skip) - totally normal
                       } finally {
                           try { s.close(); } catch (Exception ignored) {}
                       }
@@ -1890,7 +2121,7 @@ jobs:
                       RandomAccessFile raf = new RandomAccessFile(f, "r");
                       try {
                           raf.seek(start);
-                          byte[] buf = new byte[65536];
+                          byte[] buf = new byte[131072];
                           long remaining = cl;
                           while (remaining > 0) {
                               int r = raf.read(buf, 0, (int) Math.min(buf.length, remaining));
@@ -2167,7 +2398,7 @@ jobs:
                   }
               };
 
-              // ---------- Media notification buttons → offline page ----------
+              // ---------- Media notification buttons -> offline page ----------
               private final BroadcastReceiver mediaReceiver = new BroadcastReceiver() {
                   @Override
                   public void onReceive(Context context, Intent intent) {
@@ -2192,9 +2423,11 @@ jobs:
                   return PendingIntent.getBroadcast(this, req, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
               }
 
+              @SuppressWarnings("deprecation")
               private void setupMediaSession() {
                   try {
                       mediaSession = new MediaSession(this, "Music8481Offline");
+                      mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
                       mediaSession.setCallback(new MediaSession.Callback() {
                           @Override public void onPlay() { sendMediaAction("play", 0); }
                           @Override public void onPause() { sendMediaAction("pause", 0); }
@@ -2208,17 +2441,66 @@ jobs:
                   }
               }
 
+              // Builds the playback notification from the CURRENT track info (used by activity + foreground service)
+              Notification buildNotification() {
+                  Notification.Builder nb = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                          ? new Notification.Builder(this, PB_CHANNEL)
+                          : new Notification.Builder(this);
+
+                  Intent open = new Intent(this, MainActivity.class);
+                  open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                  PendingIntent contentPi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+                  final boolean playing = mPlaying;
+                  final Bitmap art = mArt;
+                  nb.setSmallIcon(playing ? android.R.drawable.ic_media_play : android.R.drawable.ic_media_pause)
+                          .setContentTitle(mTitle)
+                          .setContentText(mArtist)
+                          .setSubText(mAlbum != null && !mAlbum.isEmpty() ? mAlbum : "Music8481 Offline")
+                          .setContentIntent(contentPi)
+                          .setVisibility(Notification.VISIBILITY_PUBLIC)
+                          .setCategory(Notification.CATEGORY_TRANSPORT)
+                          .setOnlyAlertOnce(true)
+                          .setShowWhen(false)
+                          .setOngoing(playing);
+                  if (art != null) nb.setLargeIcon(art);
+
+                  nb.addAction(new Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_media_previous), "Previous", mediaPi(ACT_M_PREV, 7101)).build());
+                  nb.addAction(new Notification.Action.Builder(
+                          Icon.createWithResource(this, playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play),
+                          playing ? "Pause" : "Play", mediaPi(ACT_M_TOGGLE, 7102)).build());
+                  nb.addAction(new Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_media_next), "Next", mediaPi(ACT_M_NEXT, 7103)).build());
+
+                  Notification.MediaStyle style = new Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2);
+                  if (mediaSession != null) style.setMediaSession(mediaSession.getSessionToken());
+                  nb.setStyle(style);
+                  return nb.build();
+              }
+
+              // Used by MusicService.startForeground()
+              static Notification currentNotification(Context c) {
+                  if (INSTANCE != null) {
+                      try { return INSTANCE.buildNotification(); } catch (Exception ignored) {}
+                  }
+                  Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                          ? new Notification.Builder(c, PB_CHANNEL)
+                          : new Notification.Builder(c);
+                  return b.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("Music8481").build();
+              }
+
               private void pushMedia() {
                   if (mediaSession == null || notificationManager == null) return;
                   try {
                       MediaMetadata.Builder mb = new MediaMetadata.Builder()
+                              .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mRel)
                               .putString(MediaMetadata.METADATA_KEY_TITLE, mTitle)
                               .putString(MediaMetadata.METADATA_KEY_ARTIST, mArtist)
                               .putString(MediaMetadata.METADATA_KEY_ALBUM, mAlbum)
                               .putLong(MediaMetadata.METADATA_KEY_DURATION, mDur);
-                      if (mArt != null) {
-                          mb.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, mArt);
-                          mb.putBitmap(MediaMetadata.METADATA_KEY_ART, mArt);
+                      Bitmap art = mArt;
+                      if (art != null) {
+                          mb.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art);
+                          mb.putBitmap(MediaMetadata.METADATA_KEY_ART, art);
                       }
                       mediaSession.setMetadata(mb.build());
 
@@ -2232,37 +2514,19 @@ jobs:
                       mediaSession.setPlaybackState(ps);
                       mediaSession.setActive(true);
 
-                      Notification.Builder nb = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                              ? new Notification.Builder(this, PB_CHANNEL)
-                              : new Notification.Builder(this);
-
-                      Intent open = new Intent(this, MainActivity.class);
-                      open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                      PendingIntent contentPi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-                      nb.setSmallIcon(mPlaying ? android.R.drawable.ic_media_play : android.R.drawable.ic_media_pause)
-                        .setContentTitle(mTitle)
-                        .setContentText(mArtist)
-                        .setSubText(mAlbum != null && !mAlbum.isEmpty() ? mAlbum : "Music8481 Offline")
-                        .setContentIntent(contentPi)
-                        .setVisibility(Notification.VISIBILITY_PUBLIC)
-                        .setCategory(Notification.CATEGORY_TRANSPORT)
-                        .setOnlyAlertOnce(true)
-                        .setShowWhen(false)
-                        .setOngoing(mPlaying);
-                      if (mArt != null) nb.setLargeIcon(mArt);
-
-                      nb.addAction(new Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_media_previous), "Previous", mediaPi(ACT_M_PREV, 7101)).build());
-                      nb.addAction(new Notification.Action.Builder(
-                              Icon.createWithResource(this, mPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play),
-                              mPlaying ? "Pause" : "Play", mediaPi(ACT_M_TOGGLE, 7102)).build());
-                      nb.addAction(new Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_media_next), "Next", mediaPi(ACT_M_NEXT, 7103)).build());
-
-                      nb.setStyle(new Notification.MediaStyle()
-                              .setMediaSession(mediaSession.getSessionToken())
-                              .setShowActionsInCompactView(0, 1, 2));
-
-                      notificationManager.notify(PB_NOTI_ID, nb.build());
+                      Notification n = buildNotification();
+                      if (!serviceUp) {
+                          // Foreground service keeps the process at media priority: reliable notification updates on Android 16 + no crackle in background
+                          try {
+                              ContextCompat.startForegroundService(this, new Intent(this, MusicService.class));
+                              serviceUp = true;
+                          } catch (Exception e) {
+                              serviceUp = false;
+                              notificationManager.notify(PB_NOTI_ID, n);
+                          }
+                      } else {
+                          notificationManager.notify(PB_NOTI_ID, n);
+                      }
                   } catch (Exception e) {
                       e.printStackTrace();
                   }
@@ -2594,7 +2858,7 @@ jobs:
                       name = "Track_" + System.currentTimeMillis();
                   }
                   name = name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
-                  
+
                   String lower = name.toLowerCase();
                   if (!lower.endsWith(".mp3") && !lower.endsWith(".mp4") && !lower.endsWith(".lrc") && !lower.endsWith(".m4a") && !lower.endsWith(".wav") && !lower.endsWith(".webm")) {
                       if (mimeType != null) {
@@ -2609,9 +2873,7 @@ jobs:
               }
 
               // =========================================================================
-              // 🔥 INSTANT /download DETECTION
-              //    JS hook swallows the click / pushState BEFORE the website even starts
-              //    routing, then asks native to open the offline player immediately.
+              // INSTANT /download DETECTION
               // =========================================================================
               private void injectDownloadHook(final WebView view) {
                   if (view == null) return;
@@ -2628,12 +2890,42 @@ jobs:
                   view.evaluateJavascript(js, null);
               }
 
+              // Faster media: preconnect to video hosts, hardware-friendly video layers, NO default video thumbnail, eager YouTube iframes
               private void injectBoost(final WebView webView) {
                   if (webView == null) return;
                   String boostScript =
                       "(function() {" +
                       "  if (window.__music8481Injected) return;" +
                       "  window.__music8481Injected = true;" +
+                      "  var root = document.head || document.documentElement;" +
+                      "  var hosts = ['https://www.youtube.com','https://www.youtube-nocookie.com','https://i.ytimg.com','https://s.ytimg.com','https://www.google.com','https://ayushcom.vercel.app'];" +
+                      "  hosts.forEach(function(h) {" +
+                      "    var l = document.createElement('link'); l.rel = 'preconnect'; l.href = h; l.crossOrigin = 'anonymous'; root.appendChild(l);" +
+                      "    var d = document.createElement('link'); d.rel = 'dns-prefetch'; d.href = h; root.appendChild(d);" +
+                      "  });" +
+                      "  var st = document.createElement('style');" +
+                      "  st.textContent = 'video{background:#000!important;transform:translateZ(0);will-change:transform}video::-webkit-media-controls-overlay-placeholder,video::-webkit-media-controls-start-playback-button{display:none!important}iframe{background:#000;transform:translateZ(0)}';" +
+                      "  root.appendChild(st);" +
+                      "  var TP = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';" +
+                      "  function fixVideo(v) {" +
+                      "    if (v.__m8) return; v.__m8 = 1;" +
+                      "    v.setAttribute('poster', TP); v.preload = 'auto';" +
+                      "    v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');" +
+                      "  }" +
+                      "  function fixIframe(f) {" +
+                      "    if (f.__m8) return; f.__m8 = 1;" +
+                      "    f.setAttribute('loading', 'eager'); f.setAttribute('fetchpriority', 'high');" +
+                      "    if (!f.getAttribute('allow')) f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');" +
+                      "    f.setAttribute('allowfullscreen', '');" +
+                      "  }" +
+                      "  var scanT = 0;" +
+                      "  function scan() {" +
+                      "    scanT = 0;" +
+                      "    var vs = document.querySelectorAll('video'); for (var i = 0; i < vs.length; i++) fixVideo(vs[i]);" +
+                      "    var fs = document.querySelectorAll('iframe'); for (var j = 0; j < fs.length; j++) fixIframe(fs[j]);" +
+                      "  }" +
+                      "  scan();" +
+                      "  new MutationObserver(function() { if (!scanT) scanT = setTimeout(scan, 120); }).observe(document.documentElement, { childList: true, subtree: true });" +
                       "  " +
                       "  var OrigAudio = window.Audio;" +
                       "  window.Audio = function(src) {" +
@@ -2708,6 +3000,7 @@ jobs:
                       "  };" +
                       "  " +
                       "  setInterval(function() {" +
+                      "    if (document.hidden) return;" +
                       "    var meta = document.querySelector('meta[name=\"viewport\"]');" +
                       "    var content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
                       "    if (meta && meta.content !== content) meta.content = content;" +
@@ -2715,16 +3008,13 @@ jobs:
                       "    document.documentElement.style.margin = '0';" +
                       "    document.body.style.padding = '0';" +
                       "    document.body.style.margin = '0';" +
-                      "    " +
                       "    var medias = document.querySelectorAll('audio, video');" +
                       "    for (var i = 0; i < medias.length; i++) {" +
                       "      if (medias[i].preload !== 'auto') medias[i].preload = 'auto';" +
-                      "      medias[i].style.transform = 'translateZ(0)';" +
                       "    }" +
-                      "    " +
                       "    var iframe = document.querySelector('iframe[src*=\"ayushcom.vercel.app\"]');" +
                       "    if (window.AndroidApp) window.AndroidApp.setVideoMode(iframe !== null);" +
-                      "  }, 500);" +
+                      "  }, 1500);" +
                       "})();";
                   webView.evaluateJavascript(boostScript, null);
               }
@@ -2764,9 +3054,7 @@ jobs:
                       });
                   }
 
-                  // =========================================================================
-                  // 🔥 FAST DEVICE AUDIO LIBRARY SCAN (no ID3 here → instant)
-                  // =========================================================================
+                  // FAST DEVICE AUDIO LIBRARY SCAN (no ID3 here -> instant)
                   @JavascriptInterface
                   public String getDownloadedFiles() {
                       JSONArray result = new JSONArray();
@@ -2815,7 +3103,7 @@ jobs:
                       return result.toString();
                   }
 
-                  // Full metadata (+ .lrc content) for ONE track — used when a song is played
+                  // Full metadata (+ .lrc content) for ONE track - used when a song is played
                   @JavascriptInterface
                   public String getTrackMeta(String rel) {
                       try {
@@ -2859,17 +3147,20 @@ jobs:
                       }).start();
                   }
 
+                  // Deletes the audio file (+ its .lrc) and reports the REAL result, so the page can refresh instantly
                   @JavascriptInterface
                   public boolean deleteDownloadedFile(String rel) {
                       try {
                           File f = findLocalMediaFile(rel);
-                          if (f != null && f.exists()) {
-                              File lrc = findLrcFor(f);
-                              if (lrc != null && lrc.exists()) lrc.delete();
-                              boolean ok = f.delete();
-                              if (ok) MediaScannerConnection.scanFile(MainActivity.this, new String[]{f.getAbsolutePath()}, null, null);
-                              return ok;
+                          if (f == null) return true; // already gone
+                          File lrc = findLrcFor(f);
+                          boolean ok = f.delete();
+                          if (!ok) {
+                              try { ok = f.getCanonicalFile().delete(); } catch (Exception ignored) {}
                           }
+                          if (ok && lrc != null && lrc.exists()) lrc.delete();
+                          MediaScannerConnection.scanFile(MainActivity.this, new String[]{f.getAbsolutePath()}, null, null);
+                          return !f.exists();
                       } catch (Exception ignored) {}
                       return false;
                   }
@@ -2877,7 +3168,8 @@ jobs:
                   // ================= Native media notification (offline) =================
                   @JavascriptInterface
                   public void mediaUpdate(String title, String artist, String album, String rel, long durMs, boolean playing, long posMs) {
-                      final boolean same = rel != null && rel.equals(mRel);
+                      final String newRel = rel == null ? "" : rel;
+                      final boolean same = newRel.equals(mRel);
                       mTitle = title == null ? "" : title;
                       mArtist = artist == null ? "" : artist;
                       mAlbum = album == null ? "" : album;
@@ -2885,12 +3177,12 @@ jobs:
                       mPlaying = playing;
                       mPos = posMs;
                       if (!same) {
-                          mRel = rel == null ? "" : rel;
+                          mRel = newRel;
                           mArt = null;
                       }
                       runOnUiThread(MainActivity.this::pushMedia);
-                      if (!same && rel != null) {
-                          final String relCopy = rel;
+                      if (!same && !newRel.isEmpty()) {
+                          final String relCopy = newRel;
                           new Thread(() -> {
                               try {
                                   File f = findLocalMediaFile(relCopy);
@@ -2929,6 +3221,10 @@ jobs:
                       mPlaying = false;
                       runOnUiThread(() -> {
                           try {
+                              if (serviceUp) {
+                                  stopService(new Intent(MainActivity.this, MusicService.class));
+                                  serviceUp = false;
+                              }
                               if (notificationManager != null) notificationManager.cancel(PB_NOTI_ID);
                               if (mediaSession != null) mediaSession.setActive(false);
                           } catch (Exception ignored) {}
@@ -2994,7 +3290,8 @@ jobs:
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  
+                  INSTANCE = this;
+
                   notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                   createNotificationChannel();
                   setupMediaSession();
@@ -3003,7 +3300,7 @@ jobs:
                   localServer = new LocalServer();
                   localServer.start();
 
-                  // Android back button: first close offline-player overlays (queue, sheet, lyrics…), then minimise
+                  // Android back button: first close offline-player overlays (queue, sheet, lyrics...), then minimise
                   getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
                       @Override
                       public void handleOnBackPressed() {
@@ -3047,20 +3344,15 @@ jobs:
                       layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                       getWindow().setAttributes(layoutParams);
                   }
-                  
+
                   WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
                   getWindow().getDecorView().setOnApplyWindowInsetsListener((v, insets) -> insets);
 
                   requestAllPermissions();
                   getMusic8481Directory();
 
-                  AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-                  if (audioManager != null) {
-                      setVolumeControlStream(AudioManager.STREAM_MUSIC);
-                      try {
-                          audioManager.setMode(AudioManager.MODE_NORMAL);
-                      } catch (Exception ignored) {}
-                  }
+                  // volume keys control media volume (no AudioManager.setMode() call: it could fight the media session and cause crackle)
+                  setVolumeControlStream(AudioManager.STREAM_MUSIC);
 
                   PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
                   wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Music8481::BackgroundAudioLock");
@@ -3073,25 +3365,37 @@ jobs:
                   if (this.bridge != null && this.bridge.getWebView() != null) {
                       final WebView webView = this.bridge.getWebView();
                       WebSettings settings = webView.getSettings();
-                      
+
+                      // ---- Hardware acceleration + fast media ----
                       webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                      webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
                       settings.setMediaPlaybackRequiresUserGesture(false);
                       settings.setDomStorageEnabled(true);
                       settings.setDatabaseEnabled(true);
                       settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-                      settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
                       settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                       settings.setAllowFileAccess(true);
                       settings.setAllowContentAccess(true);
                       settings.setJavaScriptCanOpenWindowsAutomatically(true);
-                      
+                      settings.setLoadsImagesAutomatically(true);
+                      settings.setBlockNetworkImage(false);
+                      settings.setUseWideViewPort(true);
+                      try { settings.setRenderPriority(WebSettings.RenderPriority.HIGH); } catch (Throwable ignored) {}
                       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                           settings.setOffscreenPreRaster(true);
                       }
-                      
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          settings.setSafeBrowsingEnabled(false);
+                      }
+                      try {
+                          CookieManager cm = CookieManager.getInstance();
+                          cm.setAcceptCookie(true);
+                          cm.setAcceptThirdPartyCookies(webView, true);
+                      } catch (Throwable ignored) {}
+
                       webView.setFitsSystemWindows(false);
                       webView.setPadding(0, 0, 0, 0);
-                      
+
                       if (webView.getParent() instanceof ViewGroup) {
                           ((ViewGroup) webView.getParent()).setFitsSystemWindows(false);
                           ((ViewGroup) webView.getParent()).setClipToPadding(false);
@@ -3100,8 +3404,7 @@ jobs:
                       webView.removeJavascriptInterface("AndroidApp");
                       webView.addJavascriptInterface(new WebAppInterface(), "AndroidApp");
 
-                      // Navigation triggers: online /download → offline player (native fallback;
-                      // the JS hook in injectDownloadHook() normally fires first and is instant)
+                      // Navigation triggers: online /download -> offline player
                       webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
                           @Override
                           public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -3126,7 +3429,10 @@ jobs:
                           @Override
                           public void onPageCommitVisible(WebView view, String url) {
                               super.onPageCommitVisible(view, url);
-                              if (isOnlineUrl(url)) injectDownloadHook(view);
+                              if (isOnlineUrl(url)) {
+                                  injectDownloadHook(view);
+                                  injectBoost(view);
+                              }
                           }
 
                           // Fires for pushState / client-side (Next.js router) navigations too
@@ -3188,7 +3494,7 @@ jobs:
                               }
                           }
                       });
-                      
+
                       webView.postDelayed(() -> {
                           String cu = webView.getUrl();
                           if (isOnlineUrl(cu)) {
@@ -3204,13 +3510,29 @@ jobs:
                               private View mCustomView;
                               private WebChromeClient.CustomViewCallback mCustomViewCallback;
 
+                              // No more ugly grey default video thumbnail / spinner
+                              @Override
+                              public Bitmap getDefaultVideoPoster() {
+                                  if (transparentPoster == null) {
+                                      transparentPoster = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+                                  }
+                                  return transparentPoster;
+                              }
+
+                              @Override
+                              public View getVideoLoadingProgressView() {
+                                  View v = new View(MainActivity.this);
+                                  v.setBackgroundColor(0x00000000);
+                                  return v;
+                              }
+
                               @Override
                               public void onShowCustomView(View view, CustomViewCallback callback) {
                                   if (mCustomView != null) { onHideCustomView(); return; }
                                   mCustomView = view;
                                   isVideoFullscreen = true;
                                   mCustomViewCallback = callback;
-                                  
+
                                   runOnUiThread(() -> updatePiPParams(true));
                                   setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
@@ -3227,13 +3549,16 @@ jobs:
                                   ((FrameLayout) getWindow().getDecorView()).removeView(mCustomView);
                                   mCustomView = null;
                                   isVideoFullscreen = false;
-                                  
+
                                   runOnUiThread(() -> updatePiPParams(isVideoModeActive));
-                                  setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
-                                  
+                                  // free rotation on tablets / foldables, portrait lock only on phones
+                                  setRequestedOrientation(getResources().getConfiguration().smallestScreenWidthDp >= 600
+                                          ? ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                          : ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
+
                                   WindowInsetsControllerCompat windowInsetsController = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
                                   windowInsetsController.show(WindowInsetsCompat.Type.systemBars());
-                                  
+
                                   if (mCustomViewCallback != null) { mCustomViewCallback.onCustomViewHidden(); mCustomViewCallback = null; }
                               }
                               @Override
@@ -3253,7 +3578,7 @@ jobs:
                   if (this.bridge != null && this.bridge.getWebView() != null) {
                       WebView webView = this.bridge.getWebView();
                       if (isInPictureInPictureMode) {
-                          String js = 
+                          String js =
                               "var style = document.getElementById('pip-style-fix');" +
                               "if (!style) {" +
                               "  style = document.createElement('style');" +
@@ -3288,7 +3613,7 @@ jobs:
                               "}";
                           webView.evaluateJavascript(js, null);
                       } else {
-                          String js = 
+                          String js =
                               "document.body.classList.remove('pip-active');" +
                               "var elements = document.querySelectorAll('.pip-target-iframe, .pip-ancestor, .pip-hide-sibling');" +
                               "for (var i = 0; i < elements.length; i++) {" +
@@ -3312,27 +3637,70 @@ jobs:
                   super.onPause();
                   if (this.bridge != null && this.bridge.getWebView() != null) {
                       this.bridge.getWebView().resumeTimers();
-                      this.bridge.getWebView().onResume(); 
+                      this.bridge.getWebView().onResume();
                   }
               }
 
               @Override
               public void onDestroy() {
                   super.onDestroy();
+                  INSTANCE = null;
                   try { unregisterReceiver(downloadReceiver); } catch (Exception ignored) {}
                   try { unregisterReceiver(mediaReceiver); } catch (Exception ignored) {}
                   try { if (localServer != null) localServer.stop(); } catch (Exception ignored) {}
+                  try { stopService(new Intent(this, MusicService.class)); } catch (Exception ignored) {}
                   try { if (notificationManager != null) notificationManager.cancel(PB_NOTI_ID); } catch (Exception ignored) {}
                   try { if (mediaSession != null) { mediaSession.setActive(false); mediaSession.release(); } } catch (Exception ignored) {}
                   if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
               }
           }
           EOF
+          cat <<'EOF' > android/app/src/main/java/com/ayush/music/MusicService.java
+          package com.ayush.music;
+
+          import android.app.Notification;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.ServiceInfo;
+          import android.os.Build;
+          import android.os.IBinder;
+
+          // Foreground media-playback service: keeps the process at media priority while music plays,
+          // so the notification always updates (Android 16) and background audio does not crackle.
+          public class MusicService extends Service {
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  try {
+                      Notification n = MainActivity.currentNotification(this);
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                          startForeground(MainActivity.PB_NOTI_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                      } else {
+                          startForeground(MainActivity.PB_NOTI_ID, n);
+                      }
+                  } catch (Exception e) {
+                      e.printStackTrace();
+                  }
+                  return START_NOT_STICKY;
+              }
+
+              @Override
+              public void onTaskRemoved(Intent rootIntent) {
+                  try { stopForeground(true); } catch (Exception ignored) {}
+                  stopSelf();
+                  super.onTaskRemoved(rootIntent);
+              }
+          }
+          EOF
 
       - name: Fix Kotlin Duplicate Classes (Gradle Bug)
         run: |
-          cat <<EOF >> android/app/build.gradle
-          
+          cat <<'EOF' >> android/app/build.gradle
+
           dependencies {
               constraints {
                   implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22") {
@@ -3349,7 +3717,7 @@ jobs:
         run: |
           sudo apt-get install -y imagemagick
           mkdir -p assets
-          
+
           wget -q https://raw.githubusercontent.com/Ayush8481Lab/Ayushgaana/refs/heads/main/app/android-chrome-512x512.png -O assets/icon.png
           convert -size 2732x2732 xc:"#000000" assets/icon.png -gravity center -composite assets/splash.png
           npx @capacitor/assets generate --android
@@ -3357,7 +3725,7 @@ jobs:
       - name: Fix Gradle Daemon & Memory Issues (CI Stability)
         run: |
           echo "org.gradle.daemon=false" >> android/gradle.properties
-          echo "org.gradle.jvmargs=-Xmx1024m -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
 
       - name: Generate Android Keystore (For App Signing)
         run: |
