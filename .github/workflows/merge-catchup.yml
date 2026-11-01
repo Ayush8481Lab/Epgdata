@@ -1478,7 +1478,7 @@ jobs:
               private ServerSocket localServerSocket;
               private final ExecutorService httpThreadPool = Executors.newCachedThreadPool();
 
-              private static final String DOWN_TXT_URL = "https://ayushmobileappmusicgaaana.vercel.app/down.txt";
+              private static final String DOWN_TXT_URL = "https://raw.githubusercontent.com/Ayush8481Lab/Epgdata/refs/heads/main/down.txt";
               private static final String PREFS_NAME = "Music8481Prefs";
               private static final String KEY_DOWN_HASH = "cached_down_txt_sha256";
               private static final String KEY_LAST_SYNC = "cached_down_txt_last_sync";
