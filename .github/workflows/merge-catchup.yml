@@ -778,8 +778,7 @@ jobs:
           var liked = {}; try { liked = JSON.parse(localStorage.getItem('o_liked') || '{}'); } catch (e) {}
           var playlists = {}; try { playlists = JSON.parse(localStorage.getItem('o_pl') || '{}') || {}; } catch (e) { playlists = {}; }
           var sleepT = null, sleepRem = null, sleepInt = null, errCount = 0, pendingSeek = null, ixTotal = 0, ixDone = 0, loaded = false;
-          var recoverTries = 0, stallCnt = 0, lastCT = -1, lastNativeId = '';
-          var libStr = '', srvBase = '';
+          var recoverTries = 0, stallCnt = 0, lastCT = -1, lastRaw = '', lastNativeId = '';
           var cur = function () { return pos >= 0 ? tracks[order[pos]] : null; };
           function rot(arr, ix) { return arr.slice(ix).concat(arr.slice(0, ix)); }
 
@@ -847,33 +846,29 @@ jobs:
           var ixDirty = false, ixSaveT = null, refreshT = null;
           function ixKey(t) { return t.size + '|' + t.lastModified; }
           window.__onMeta = function (arr) {
-          var done = [];
           for (var n = 0; n < arr.length; n++) {
           var m = arr[n], t = idMap[m.id]; if (!t) continue;
           ixDone++;
           if (!t.full) { t.m = m; applyMeta(t); }
           ixCache[t.id] = { k: ixKey(t), m: { title: m.title, artist: m.artist, album: m.album, duration: m.duration, bitrate: m.bitrate, hasArt: m.hasArt, year: m.year, genre: m.genre } };
-          ixDirty = true; done.push(t);
+          ixDirty = true; refreshRows(t);
           }
-          if (done.length) refreshBatch(done);
           updateLibInfo();
           clearTimeout(refreshT); refreshT = setTimeout(function () { if (tab === 'albums' || tab === 'artists' || tab === 'playlists') renderView(); renderRecent(); }, 900);
           clearTimeout(ixSaveT); ixSaveT = setTimeout(saveIx, 2500);
           };
           window.__onMetaDone = function () { ixDone = ixTotal; updateLibInfo(); saveIx(); renderView(); renderRecent(); };
           function saveIx() { if (!ixDirty) return; ixDirty = false; try { localStorage.setItem('o_ix', JSON.stringify(ixCache)); } catch (e) { ixCache = {}; } }
-          /* One DOM query per batch (instead of one per track) → indexing never janks the list */
-          function refreshBatch(ts) {
-          var sel = ts.map(function (t) { return '[data-t="' + t.i + '"]'; }).join(',');
-          var els = $$(sel);
+          function refreshRows(t) {
+          var els = $$('[data-t="' + t.i + '"]');
           for (var q = 0; q < els.length; q++) {
-          var el = els[q], t = tracks[+el.getAttribute('data-t')], f = el.getAttribute('data-f'); if (!t) continue;
+          var el = els[q], f = el.getAttribute('data-f');
           if (f === 'title') el.textContent = t.title; else if (f === 'artist') el.textContent = t.artist; else if (f === 'art') el.innerHTML = artInner(t);
           }
-          var c = cur(); if (c && ts.indexOf(c) >= 0) setTrackTexts(c);
+          if (cur() === t) setTrackTexts(t);
           }
           function thumbBg(t) { var h = hueOf(t.baseName); return 'linear-gradient(135deg,hsl(' + h + ',42%,34%),hsl(' + ((h + 40) % 360) + ',42%,22%))'; }
-          function artInner(t) { return t.hasArt ? '<img src="' + t.artUrl + '" loading="lazy" decoding="async" onerror="this.remove()">' : '<span>' + esc((t.title || '?').charAt(0).toUpperCase()) + '</span>'; }
+          function artInner(t) { return t.hasArt ? '<img src="' + t.artUrl + '" onerror="this.remove()">' : '<span>' + esc((t.title || '?').charAt(0).toUpperCase()) + '</span>'; }
           function artBox(el, t) { el.style.background = thumbBg(t); el.innerHTML = artInner(t); }
           function qualityOf(t) {
           var ext = (t.ext || '').toLowerCase(), kb = t.br ? Math.round(t.br / 1000) : 0;
@@ -881,21 +876,16 @@ jobs:
           return { lossless: false, label: ext.toUpperCase() + (kb ? ' · ' + kb + ' kbps' : '') };
           }
 
-          /* ================= library loading (INSTANT) =================
-             1) the last scan is cached in localStorage → list paints in the very first frame
-             2) native scan runs on a background thread and pushes the fresh list via window.__onLibrary
-             3) UI only re-renders when the library really changed */
-          function encPath(rel) { return String(rel).split('/').map(encodeURIComponent).join('/'); }
-          function ingest(rawStr) {
-          var raw = []; try { raw = JSON.parse(rawStr); } catch (e) { return false; }
-          if (!Array.isArray(raw)) return false;
-          libStr = rawStr;
+          /* ================= library loading ================= */
+          function loadTracks() {
+          if (!A || !A.getDownloadedFiles) { $('#libInfo').textContent = 'Open inside the Music8481 app'; $('#view').innerHTML = emptyHtml('Offline library works inside the Android app.', 'Open Music8481 on your phone.'); return; }
           var oldOrderIds = order.map(function (i) { return tracks[i] && tracks[i].id; }), oldBaseIds = baseOrder.map(function (i) { return tracks[i] && tracks[i].id; });
           var curId = cur() ? cur().id : null;
+          var rawStr = '[]'; try { rawStr = A.getDownloadedFiles() || '[]'; } catch (e) {}
+          lastRaw = rawStr;
+          var raw = []; try { raw = JSON.parse(rawStr); } catch (e) {}
           idMap = {}; var todo = [];
           tracks = raw.map(function (o, i) {
-          var enc = encPath(o.id);
-          o.url = srvBase + '/f/' + enc; o.artUrl = srvBase + '/__art__/' + enc;
           o.i = i; o.m = null; o.full = false; var c = ixCache[o.id];
           if (c && c.k === ixKey(o)) o.m = c.m; else todo.push(o.id);
           applyMeta(o); idMap[o.id] = o; return o;
@@ -906,26 +896,14 @@ jobs:
           if (pos < 0) { order = []; baseOrder = []; }
           loaded = true;
           ixTotal = todo.length; ixDone = 0;
-          if (todo.length && A && A.indexTracks) { try { A.indexTracks(JSON.stringify(todo)); } catch (e) {} }
+          if (todo.length && A.indexTracks) { try { A.indexTracks(JSON.stringify(todo)); } catch (e) {} }
           renderHome();
           if (!cur()) restoreLast();
-          return true;
           }
-          function loadTracks() {
-          if (!A || !A.scanLibraryAsync) { $('#libInfo').textContent = 'Open inside the Music8481 app'; $('#view').innerHTML = emptyHtml('Offline library works inside the Android app.', 'Open Music8481 on your phone.'); return; }
-          try { srvBase = A.getServerBase() || ''; } catch (e) {}
-          if (!loaded) { var c = null; try { c = localStorage.getItem('o_lib'); } catch (e) {} if (c) ingest(c); }
-          try { A.scanLibraryAsync(); } catch (e) {}
-          }
-          window.__onLibrary = function (str) {
-          try { localStorage.setItem('o_lib', str); } catch (e) {}
-          if (loaded && str === libStr) { updateLibInfo(); return; }
-          ingest(str); refreshDetail();
-          };
-          /* Quick check when the app comes back to the foreground — async native scan, UI only updates if files changed */
+          /* Quick check when the app comes back to the foreground — reloads only if files changed on disk */
           function softRescan() {
-          if (!loaded || !A || !A.scanLibraryAsync) return;
-          try { A.scanLibraryAsync(); } catch (e) {}
+          if (!loaded || !A || !A.getDownloadedFiles) return;
+          try { var s = A.getDownloadedFiles() || '[]'; if (s !== lastRaw) { loadTracks(); refreshDetail(); } } catch (e) {}
           }
           function updateLibInfo() {
           var el = $('#libInfo'); if (!el) return;
@@ -1019,21 +997,6 @@ jobs:
           var q = qualityOf(t);
           return '<div class="row' + (cur() === t ? ' active' : '') + '" data-i="' + t.i + '" data-ix="' + ix + '"><div class="art" data-t="' + t.i + '" data-f="art" style="background:' + thumbBg(t) + '">' + artInner(t) + '</div><div class="rt"><div class="rtitle" data-t="' + t.i + '" data-f="title">' + esc(t.title) + '</div><div class="rartist" data-t="' + t.i + '" data-f="artist">' + esc(t.artist) + '</div><div class="rmeta"><span>' + mb(t.size) + ' MB</span><span>' + esc(t.ext.toUpperCase()) + '</span>' + (q.lossless ? '<span class="tagx l">LOSSLESS</span>' : '') + (t.hasLyrics ? '<span class="tagx l">LRC</span>' : '') + '</div></div><button class="rmore" data-more="' + t.i + '" aria-label="More">' + IC.dots(20) + '</button></div>';
           }
-          /* Chunked list rendering: first rows paint immediately, the rest streams in without blocking the UI */
-          var rowTok = 0;
-          function fillRows(el, L, head) {
-          var tok = ++rowTok, N = 40;
-          el.innerHTML = (head || '') + L.slice(0, N).map(rowHtml).join('');
-          if (L.length <= N) return;
-          var i = N;
-          (function more() {
-          if (tok !== rowTok) return;
-          var end = Math.min(L.length, i + 120), h = '';
-          for (var k = i; k < end; k++) h += rowHtml(L[k], k);
-          el.insertAdjacentHTML('beforeend', h); i = end;
-          if (i < L.length) setTimeout(more, 16);
-          })();
-          }
           function groupBy(keyFn, nameFn) {
           var m = {}, arr = [];
           tracks.forEach(function (t) { var k = keyFn(t); if (!m[k]) { m[k] = { key: k, name: nameFn(t), tracks: [] }; arr.push(m[k]); } m[k].tracks.push(t); });
@@ -1051,15 +1014,13 @@ jobs:
           }
           var groups = [];
           function renderView() {
-          rowTok++;
           var v = $('#view'), app = $('#app');
           if (!loaded) { v.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div>'; return; }
           if (searchQ) {
           app.classList.add('searching'); var q = searchQ.toLowerCase();
           var R = tracks.filter(function (t) { return (t.title + ' ' + t.artist + ' ' + t.album + ' ' + t.baseName).toLowerCase().indexOf(q) !== -1; });
           v._ctx = R; v.className = 'list';
-          if (R.length) fillRows(v, R, '<div class="res-h">' + R.length + ' result' + (R.length === 1 ? '' : 's') + ' for “' + esc(searchQ) + '”</div>');
-          else v.innerHTML = emptyHtml('No matches', 'Try a different title, artist or album.');
+          v.innerHTML = R.length ? '<div class="res-h">' + R.length + ' result' + (R.length === 1 ? '' : 's') + ' for “' + esc(searchQ) + '”</div>' + R.map(rowHtml).join('') : emptyHtml('No matches', 'Try a different title, artist or album.');
           return;
           }
           app.classList.remove('searching'); updateLibInfo();
@@ -1067,7 +1028,7 @@ jobs:
           if (tab === 'songs' || tab === 'liked') {
           var L = tab === 'songs' ? sortedTracks() : tracks.filter(function (t) { return liked[t.id]; });
           v._ctx = L; v.className = 'list';
-          if (L.length) fillRows(v, L, ''); else v.innerHTML = emptyHtml('Nothing liked yet', 'Tap the heart in the player to save songs here.');
+          v.innerHTML = L.length ? L.map(rowHtml).join('') : emptyHtml('Nothing liked yet', 'Tap the heart in the player to save songs here.');
           } else if (tab === 'albums') {
           groups = sortGroups(groupBy(function (t) { return (t.album || 'Unknown album').toLowerCase(); }, function (t) { return t.album || 'Unknown album'; }), 'Unknown album');
           v.className = 'grid2';
@@ -1207,7 +1168,7 @@ jobs:
           else if (a === 'album') { var g = groupBy(function (x) { return (x.album || 'Unknown album').toLowerCase(); }, function (x) { return x.album || 'Unknown album'; }).filter(function (x) { return x.key === (t.album || 'Unknown album').toLowerCase(); })[0]; setTimeout(function () { openDetail(g, 'albums'); }, 120); }
           else if (a === 'artist') { var g2 = groupBy(function (x) { return x.pa.toLowerCase(); }, function (x) { return x.pa; }).filter(function (x) { return x.key === t.pa.toLowerCase(); })[0]; setTimeout(function () { openDetail(g2, 'artists'); }, 120); }
           });
-          /* Delete: clean every reference, stop playback if needed, drop the song from the list INSTANTLY, then let the async native scan confirm */
+          /* Delete: clean every reference, stop playback if needed, then refresh the list from disk immediately (and once more to be sure) */
           function afterDelete(t, wasCur) {
           var id = t.id;
           delete ixCache[id]; ixDirty = true; saveIx(); delete palCache[id];
@@ -1221,11 +1182,8 @@ jobs:
           if (playerOpen) closeOv('player'); if (queueOpen) closeOv('queue');
           }
           toast('Deleted ' + t.title);
-          var arr = []; try { arr = JSON.parse(libStr || '[]'); } catch (e) {}
-          arr = arr.filter(function (x) { return x.id !== id; });
-          var s = JSON.stringify(arr); ingest(s); try { localStorage.setItem('o_lib', s); } catch (e) {}
-          refreshDetail(); saveQueue();
-          setTimeout(function () { try { A.scanLibraryAsync(); } catch (e) {} }, 400);
+          loadTracks(); refreshDetail(); saveQueue();
+          setTimeout(function () { loadTracks(); refreshDetail(); }, 500);
           }
           function saveLiked() { try { localStorage.setItem('o_liked', JSON.stringify(liked)); } catch (e) {} renderHearts(); renderTabs(); }
           function queueNext(t) {
@@ -1739,9 +1697,9 @@ jobs:
           $('#segCard').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; settings.card = b.getAttribute('data-v'); saveSettings(); applyFonts(); syncSettingsUI(); });
           applyFonts(); syncSettingsUI();
 
-          /* ================= boot (no artificial delay: cached library paints immediately) ================= */
-          applyPalette(DEFAULT_PAL); checkNet(); renderTabs(); loadTracks();
-          if (!loaded) renderView();
+          /* ================= boot ================= */
+          applyPalette(DEFAULT_PAL); checkNet(); renderTabs(); renderView();
+          setTimeout(loadTracks, 150);
           })();
           </script>
           </body>
@@ -1756,28 +1714,18 @@ jobs:
             "appId": "com.ayush.music",
             "appName": "Music8481",
             "webDir": "www",
-            "backgroundColor": "#07070b",
             "server": {
               "url": "https://ayushmobileappmusicgaaana.vercel.app",
               "cleartext": true,
               "errorPath": "error.html"
             },
-            "android": {
-              "allowMixedContent": true,
-              "backgroundColor": "#07070b"
-            },
             "plugins": {
-              "CapacitorHttp": {
-                "enabled": true
-              },
               "SplashScreen": {
                 "launchShowDuration": 0,
                 "launchAutoHide": true,
-                "launchFadeOutDuration": 120,
                 "backgroundColor": "#07070b",
                 "androidSplashResourceName": "splash",
-                "showSpinner": false,
-                "useDialog": false
+                "showSpinner": false
               }
             }
           }
@@ -1861,7 +1809,6 @@ jobs:
           import android.content.res.Configuration;
           import android.graphics.Bitmap;
           import android.graphics.BitmapFactory;
-          import android.graphics.Color;
           import android.graphics.drawable.Icon;
           import android.media.AudioManager;
           import android.media.MediaMetadata;
@@ -1969,12 +1916,6 @@ jobs:
               private volatile Bitmap mArt = null;
               private volatile int indexGen = 0;
               private boolean serviceUp = false;
-
-              // ---- Instant offline library: background scanner + pre-warmed result ----
-              private final ExecutorService scanPool = Executors.newSingleThreadExecutor();
-              private volatile int scanGen = 0;
-              private volatile String prewarmJson = null;
-              private volatile long prewarmAt = 0;
 
               private NotificationManager notificationManager;
               private final AtomicInteger notificationIdCounter = new AtomicInteger(2000);
@@ -2795,65 +2736,6 @@ jobs:
                   return o;
               }
 
-              // Builds the device audio library JSON (file system walk only, no ID3 → fast).
-              // withUrls=false → compact form that the page caches in localStorage (URLs are rebuilt on the page from getServerBase()).
-              private String buildLibraryJson(boolean withUrls) {
-                  JSONArray result = new JSONArray();
-                  try {
-                      String base = (withUrls && localServer != null) ? localServer.base() : "";
-                      List<File> allFiles = new ArrayList<>();
-                      Set<String> seen = new HashSet<>();
-                      for (File root : getScanRoots()) {
-                          scanAudio(root, 3, allFiles, seen);
-                      }
-                      allFiles.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-
-                      Map<String, Set<String>> lrcCache = new HashMap<>();
-
-                      for (File f : allFiles) {
-                          String name = f.getName();
-                          int dotIdx = name.lastIndexOf('.');
-                          if (dotIdx <= 0) continue;
-                          String baseName = name.substring(0, dotIdx).trim();
-                          String ext = name.substring(dotIdx + 1).toLowerCase();
-                          String rel = relPath(f);
-
-                          JSONObject obj = new JSONObject();
-                          obj.put("id", rel);
-                          obj.put("name", name);
-                          obj.put("baseName", baseName);
-                          obj.put("ext", ext);
-                          obj.put("size", f.length());
-                          obj.put("lastModified", f.lastModified());
-                          if (withUrls) {
-                              String enc = encodePath(rel);
-                              obj.put("url", base + "/f/" + enc);
-                              obj.put("artUrl", base + "/__art__/" + enc);
-                          }
-                          obj.put("isDownload", rel.startsWith("Music8481/"));
-
-                          File parent = f.getParentFile();
-                          String parentRel = rel.contains("/") ? rel.substring(0, rel.lastIndexOf('/')) : "";
-                          obj.put("folder", parentRel);
-
-                          boolean hasLrc = parent != null && lrcBases(parent, lrcCache).contains(baseName.toLowerCase());
-                          obj.put("hasLyrics", hasLrc);
-                          result.put(obj);
-                      }
-                  } catch (Exception e) {
-                      e.printStackTrace();
-                  }
-                  return result.toString();
-              }
-
-              private static String jsSafe(String s) {
-                  return s.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
-              }
-
-              private void pushMetaBatch(JSONArray batch) {
-                  pushJs("window.__onMeta&&window.__onMeta(" + jsSafe(batch.toString()) + ")");
-              }
-
               private void pushJs(final String js) {
                   runOnUiThread(() -> {
                       WebView w = (bridge != null) ? bridge.getWebView() : null;
@@ -3171,39 +3053,53 @@ jobs:
                       });
                   }
 
-                  // Base URL of the local media server (page builds song / cover URLs from it)
-                  @JavascriptInterface
-                  public String getServerBase() {
-                      return localServer != null ? localServer.base() : "";
-                  }
-
-                  // Kept for compatibility (synchronous). The offline page now uses scanLibraryAsync().
+                  // FAST DEVICE AUDIO LIBRARY SCAN (no ID3 here -> instant)
                   @JavascriptInterface
                   public String getDownloadedFiles() {
-                      return buildLibraryJson(true);
-                  }
-
-                  // NON-BLOCKING library scan: runs on a background thread and pushes the result to window.__onLibrary(jsonString).
-                  // If the start-up pre-scan just finished, its result is delivered immediately (instant list).
-                  @JavascriptInterface
-                  public void scanLibraryAsync() {
-                      final int gen = ++scanGen;
-                      scanPool.execute(() -> {
-                          try {
-                              String json;
-                              String pre = prewarmJson;
-                              if (pre != null && pre.length() > 2 && System.currentTimeMillis() - prewarmAt < 4000) {
-                                  json = pre;
-                                  prewarmJson = null;
-                              } else {
-                                  json = buildLibraryJson(false);
-                              }
-                              if (gen != scanGen) return; // a newer scan is queued, it will deliver the fresh list
-                              pushJs("window.__onLibrary&&window.__onLibrary(" + jsSafe(JSONObject.quote(json)) + ")");
-                          } catch (Exception e) {
-                              e.printStackTrace();
+                      JSONArray result = new JSONArray();
+                      try {
+                          String base = localServer != null ? localServer.base() : "";
+                          List<File> allFiles = new ArrayList<>();
+                          Set<String> seen = new HashSet<>();
+                          for (File root : getScanRoots()) {
+                              scanAudio(root, 3, allFiles, seen);
                           }
-                      });
+                          allFiles.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+
+                          Map<String, Set<String>> lrcCache = new HashMap<>();
+
+                          for (File f : allFiles) {
+                              String name = f.getName();
+                              int dotIdx = name.lastIndexOf('.');
+                              if (dotIdx <= 0) continue;
+                              String baseName = name.substring(0, dotIdx).trim();
+                              String ext = name.substring(dotIdx + 1).toLowerCase();
+                              String rel = relPath(f);
+                              String enc = encodePath(rel);
+
+                              JSONObject obj = new JSONObject();
+                              obj.put("id", rel);
+                              obj.put("name", name);
+                              obj.put("baseName", baseName);
+                              obj.put("ext", ext);
+                              obj.put("size", f.length());
+                              obj.put("lastModified", f.lastModified());
+                              obj.put("url", base + "/f/" + enc);
+                              obj.put("artUrl", base + "/__art__/" + enc);
+                              obj.put("isDownload", rel.startsWith("Music8481/"));
+
+                              File parent = f.getParentFile();
+                              String parentRel = rel.contains("/") ? rel.substring(0, rel.lastIndexOf('/')) : "";
+                              obj.put("folder", parentRel);
+
+                              boolean hasLrc = parent != null && lrcBases(parent, lrcCache).contains(baseName.toLowerCase());
+                              obj.put("hasLyrics", hasLrc);
+                              result.put(obj);
+                          }
+                      } catch (Exception e) {
+                          e.printStackTrace();
+                      }
+                      return result.toString();
                   }
 
                   // Full metadata (+ .lrc content) for ONE track - used when a song is played
@@ -3218,41 +3114,32 @@ jobs:
                       }
                   }
 
-                  // Background indexer (3 parallel workers): reads metadata off the JS thread and streams results back in batches
+                  // Background indexer: reads metadata for many tracks off the JS thread and streams results back
                   @JavascriptInterface
                   public void indexTracks(final String idsJson) {
                       final int gen = ++indexGen;
                       new Thread(() -> {
                           try {
-                              final JSONArray ids = new JSONArray(idsJson);
-                              final int n = ids.length();
-                              final int workers = 3;
-                              final AtomicInteger cursor = new AtomicInteger(0);
-                              final AtomicInteger finished = new AtomicInteger(0);
-                              for (int w = 0; w < workers; w++) {
-                                  new Thread(() -> {
-                                      JSONArray batch = new JSONArray();
-                                      try {
-                                          int i;
-                                          while (gen == indexGen && (i = cursor.getAndIncrement()) < n) {
-                                              String rel = ids.getString(i);
-                                              File f = findLocalMediaFile(rel);
-                                              if (f == null) continue;
-                                              batch.put(buildMeta(f, rel, false));
-                                              if (batch.length() >= 20) {
-                                                  pushMetaBatch(batch);
-                                                  batch = new JSONArray();
-                                              }
-                                          }
-                                          if (batch.length() > 0 && gen == indexGen) pushMetaBatch(batch);
-                                      } catch (Exception e) {
-                                          e.printStackTrace();
-                                      }
-                                      if (finished.incrementAndGet() == workers && gen == indexGen) {
-                                          pushJs("window.__onMetaDone&&window.__onMetaDone()");
-                                      }
-                                  }, "Music8481-Index").start();
+                              JSONArray ids = new JSONArray(idsJson);
+                              JSONArray batch = new JSONArray();
+                              for (int n = 0; n < ids.length(); n++) {
+                                  if (gen != indexGen) return;
+                                  String rel = ids.getString(n);
+                                  File f = findLocalMediaFile(rel);
+                                  if (f == null) continue;
+                                  batch.put(buildMeta(f, rel, false));
+                                  if (batch.length() >= 10) {
+                                      String js = "window.__onMeta&&window.__onMeta(" + batch.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
+                                      pushJs(js);
+                                      batch = new JSONArray();
+                                      Thread.sleep(10);
+                                  }
                               }
+                              if (batch.length() > 0 && gen == indexGen) {
+                                  String js = "window.__onMeta&&window.__onMeta(" + batch.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029") + ")";
+                                  pushJs(js);
+                              }
+                              if (gen == indexGen) pushJs("window.__onMetaDone&&window.__onMetaDone()");
                           } catch (Exception e) {
                               e.printStackTrace();
                           }
@@ -3412,16 +3299,6 @@ jobs:
                   localServer = new LocalServer();
                   localServer.start();
 
-                  // Pre-warm the offline library on a background thread right at launch,
-                  // so by the time the offline page opens the list is already ready (instant)
-                  scanPool.execute(() -> {
-                      try {
-                          String j = buildLibraryJson(false);
-                          prewarmJson = j;
-                          prewarmAt = System.currentTimeMillis();
-                      } catch (Exception ignored) {}
-                  });
-
                   // Android back button: first close offline-player overlays (queue, sheet, lyrics...), then minimise
                   getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
                       @Override
@@ -3491,8 +3368,6 @@ jobs:
                       // ---- Hardware acceleration + fast media ----
                       webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
                       webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
-                      // Dark WebView background → no white flash while the page loads (feels much faster after the splash)
-                      webView.setBackgroundColor(Color.parseColor("#07070B"));
                       settings.setMediaPlaybackRequiresUserGesture(false);
                       settings.setDomStorageEnabled(true);
                       settings.setDatabaseEnabled(true);
@@ -3500,9 +3375,6 @@ jobs:
                       settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                       settings.setAllowFileAccess(true);
                       settings.setAllowContentAccess(true);
-                      // Offline page (file://) may talk to the local media server / any origin
-                      try { settings.setAllowFileAccessFromFileURLs(true); } catch (Throwable ignored) {}
-                      try { settings.setAllowUniversalAccessFromFileURLs(true); } catch (Throwable ignored) {}
                       settings.setJavaScriptCanOpenWindowsAutomatically(true);
                       settings.setLoadsImagesAutomatically(true);
                       settings.setBlockNetworkImage(false);
@@ -3775,7 +3647,6 @@ jobs:
                   try { unregisterReceiver(downloadReceiver); } catch (Exception ignored) {}
                   try { unregisterReceiver(mediaReceiver); } catch (Exception ignored) {}
                   try { if (localServer != null) localServer.stop(); } catch (Exception ignored) {}
-                  try { scanPool.shutdownNow(); } catch (Exception ignored) {}
                   try { stopService(new Intent(this, MusicService.class)); } catch (Exception ignored) {}
                   try { if (notificationManager != null) notificationManager.cancel(PB_NOTI_ID); } catch (Exception ignored) {}
                   try { if (mediaSession != null) { mediaSession.setActive(false); mediaSession.release(); } } catch (Exception ignored) {}
@@ -3825,6 +3696,817 @@ jobs:
           }
           EOF
 
+      - name: Apply Pro Upgrade (Fast Library, Musical Splash, Audio Engine)
+        run: |
+          D=android/app/src/main/java/com/ayush/music
+
+          cat <<'EOF' > $D/SplashView.java
+          package com.ayush.music;
+
+          import android.content.Context;
+          import android.graphics.Canvas;
+          import android.graphics.LinearGradient;
+          import android.graphics.Paint;
+          import android.graphics.Path;
+          import android.graphics.RadialGradient;
+          import android.graphics.RectF;
+          import android.graphics.Shader;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.AdaptiveIconDrawable;
+          import android.graphics.drawable.Drawable;
+          import android.os.Build;
+          import android.view.View;
+
+          public class SplashView extends View {
+            private static final int BARS = 11;
+            private static final String[] NOTES = {"\u266A", "\u266B", "\u266C", "\u266A", "\u266B"};
+            private static final int[] NCOL = {0xFF1ED760, 0xFF22D3EE, 0xFF8B5CF6, 0xFF1ED760, 0xFF22D3EE};
+            private final float d;
+            private final long t0 = System.nanoTime();
+            private final Paint pBar = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint pRing = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint pGlow = new Paint();
+            private final Paint pTitle = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint pSub = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint pNote = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint pFill = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final RectF rf = new RectF();
+            private final Path clip = new Path();
+            private Drawable logo;
+            private boolean adaptive = false;
+            private Shader glow, barShader;
+
+            public SplashView(Context c) {
+              super(c);
+              d = c.getResources().getDisplayMetrics().density;
+              setBackgroundColor(0xFF07070B);
+              try {
+                int id = c.getResources().getIdentifier("ic_launcher_round", "mipmap", c.getPackageName());
+                if (id == 0) id = c.getResources().getIdentifier("ic_launcher", "mipmap", c.getPackageName());
+                if (id != 0) {
+                  logo = c.getDrawable(id);
+                  adaptive = Build.VERSION.SDK_INT >= 26 && logo instanceof AdaptiveIconDrawable;
+                }
+              } catch (Exception ignored) {}
+              pRing.setStyle(Paint.Style.STROKE);
+              pRing.setStrokeWidth(2 * d);
+              pRing.setColor(0xFF1ED760);
+              pTitle.setColor(0xFFFFFFFF);
+              pTitle.setTextAlign(Paint.Align.CENTER);
+              pTitle.setTextSize(28 * d);
+              pTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+              pTitle.setLetterSpacing(0.08f);
+              pSub.setColor(0xFFFFFFFF);
+              pSub.setTextAlign(Paint.Align.CENTER);
+              pSub.setTextSize(12 * d);
+              pSub.setLetterSpacing(0.18f);
+              pNote.setTypeface(Typeface.DEFAULT_BOLD);
+            }
+
+            @Override
+            protected void onSizeChanged(int w, int h, int ow, int oh) {
+              float cx = w / 2f, cy = h * 0.38f;
+              glow = new RadialGradient(cx, cy, Math.max(w, h) * 0.55f,
+                new int[]{0x4D1ED760, 0x228B5CF6, 0x00000000}, new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP);
+              float tot = BARS * 6 * d + (BARS - 1) * 5 * d;
+              barShader = new LinearGradient(cx - tot / 2f, 0, cx + tot / 2f, 0,
+                new int[]{0xFF1ED760, 0xFF22D3EE, 0xFF8B5CF6}, null, Shader.TileMode.CLAMP);
+            }
+
+            private static float clamp01(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+            @Override
+            protected void onDraw(Canvas c) {
+              super.onDraw(c);
+              int w = getWidth(), h = getHeight();
+              if (w == 0 || glow == null) return;
+              float t = (System.nanoTime() - t0) / 1e9f;
+              float cx = w / 2f, cy = h * 0.38f, S = 112 * d;
+              float in = Math.min(1f, t / 0.5f);
+              float ease = 1f - (float) Math.pow(1f - in, 3);
+
+              pGlow.setShader(glow);
+              c.drawRect(0, 0, w, h, pGlow);
+
+              for (int k = 0; k < 3; k++) {
+                float ph = (t * 0.8f + k / 3f) % 1f;
+                pRing.setAlpha((int) (255 * 0.38f * (1f - ph) * ease));
+                c.drawCircle(cx, cy, S * 0.5f + ph * S * 0.95f, pRing);
+              }
+
+              float beat = 1f + 0.04f * (float) Math.sin(t * 7f) * ease;
+              float sc = (0.55f + 0.45f * ease) * beat;
+              c.save();
+              c.scale(sc, sc, cx, cy);
+              if (logo != null) {
+                clip.reset();
+                clip.addCircle(cx, cy, S / 2f, Path.Direction.CW);
+                c.save();
+                c.clipPath(clip);
+                float L = adaptive ? S * 1.5f : S;
+                logo.setBounds((int) (cx - L / 2), (int) (cy - L / 2), (int) (cx + L / 2), (int) (cy + L / 2));
+                logo.setAlpha((int) (255 * ease));
+                logo.draw(c);
+                c.restore();
+              } else {
+                pFill.setColor(0xFF1ED760);
+                c.drawCircle(cx, cy, S / 2f, pFill);
+              }
+              c.restore();
+
+              for (int i = 0; i < NOTES.length; i++) {
+                float ph = (t * 0.55f + i * 0.2f) % 1f;
+                float y = cy - S * 0.2f - ph * 150 * d;
+                float x = cx + (i - 2) * 46 * d + (float) Math.sin(t * 2f + i) * 14 * d;
+                float a = (float) Math.sin(Math.PI * ph) * 0.85f * ease;
+                pNote.setColor(NCOL[i]);
+                pNote.setAlpha((int) (255 * a));
+                pNote.setTextSize((18 + (i % 3) * 5) * d);
+                c.drawText(NOTES[i], x, y, pNote);
+              }
+
+              float bw = 6 * d, gap = 5 * d, tot = BARS * bw + (BARS - 1) * gap, x0 = cx - tot / 2f;
+              float base = cy + S / 2f + 72 * d, maxH = 44 * d;
+              pBar.setShader(barShader);
+              pBar.setAlpha((int) (255 * ease));
+              for (int i = 0; i < BARS; i++) {
+                float sp = 5.5f + ((i * 7) % 5) * 1.3f;
+                float v = 0.5f + 0.5f * (float) Math.sin(t * sp + i * 1.7f);
+                float v2 = 0.5f + 0.5f * (float) Math.sin(t * sp * 0.53f + i * 0.9f);
+                float hh = maxH * (0.18f + 0.82f * (0.6f * v + 0.4f * v2)) * ease;
+                float x = x0 + i * (bw + gap);
+                rf.set(x, base - hh, x + bw, base);
+                c.drawRoundRect(rf, bw / 2, bw / 2, pBar);
+              }
+
+              float ta = clamp01((t - 0.25f) / 0.4f);
+              pTitle.setAlpha((int) (255 * ta));
+              c.drawText("Music8481", cx, base + 44 * d, pTitle);
+              pSub.setAlpha((int) (150 * clamp01((t - 0.45f) / 0.4f)));
+              c.drawText("YOUR MUSIC. EVERYWHERE.", cx, base + 68 * d, pSub);
+
+              postInvalidateOnAnimation();
+            }
+          }
+          EOF
+
+          cat <<'EOF' > $D/Library.java
+          package com.ayush.music;
+
+          import android.content.Context;
+          import android.database.Cursor;
+          import android.graphics.Bitmap;
+          import android.graphics.BitmapFactory;
+          import android.media.AudioDeviceInfo;
+          import android.media.AudioManager;
+          import android.media.MediaMetadataRetriever;
+          import android.os.Build;
+          import android.os.Environment;
+          import android.provider.MediaStore;
+
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          import java.io.ByteArrayOutputStream;
+          import java.io.File;
+          import java.io.FileInputStream;
+          import java.io.FileOutputStream;
+          import java.net.URLEncoder;
+          import java.nio.charset.StandardCharsets;
+          import java.security.MessageDigest;
+          import java.util.ArrayList;
+          import java.util.Collections;
+          import java.util.HashMap;
+          import java.util.HashSet;
+          import java.util.List;
+          import java.util.Map;
+          import java.util.Set;
+
+          /** Fast MediaStore-based library, cached art thumbnails, lyrics and audio-device info. */
+          public final class Library {
+            private Library() {}
+
+            private static final String PH = "@@B@@";
+            private static final String[] ROOTS = {"Music8481/Download/", "Music8481/Downloads/", "Music/", "Download/", "Downloads/"};
+            private static final String[] QUICK = {"Music8481/Download", "Music8481/Downloads"};
+            private static String cache = null;
+            private static long cacheGen = -2;
+            private static int dirty = 0;
+
+            static synchronized void invalidate() { cache = null; dirty++; }
+
+            static long generation(Context c) {
+              if (Build.VERSION.SDK_INT >= 30) {
+                try { return MediaStore.getGeneration(c, MediaStore.VOLUME_EXTERNAL); } catch (Throwable ignored) {}
+              }
+              return -1;
+            }
+
+            static synchronized String version(Context c) {
+              long g = generation(c);
+              return g < 0 ? "" : g + ":" + dirty;
+            }
+
+            static void prewarm(final Context c) {
+              new Thread(() -> { try { listJson(c, ""); } catch (Throwable ignored) {} }, "lib-prewarm").start();
+            }
+
+            static synchronized String listJson(Context c, String base) {
+              try {
+                long gen = generation(c);
+                if (cache == null || gen < 0 || gen != cacheGen) {
+                  String built = build(c);
+                  if (built == null) { cache = null; return "[]"; }
+                  cache = built;
+                  cacheGen = gen;
+                }
+                return cache.replace(PH, base);
+              } catch (Throwable t) {
+                return "[]";
+              }
+            }
+
+            private static boolean isAudio(String e) {
+              return e.equals("mp3") || e.equals("m4a") || e.equals("wav") || e.equals("ogg") || e.equals("flac") || e.equals("aac") || e.equals("opus");
+            }
+
+            private static boolean inRoots(String rel) {
+              if (rel.startsWith(".") || rel.contains("/.")) return false;
+              for (String r : ROOTS) if (rel.regionMatches(true, 0, r, 0, r.length())) return true;
+              return false;
+            }
+
+            private static String nz(String s) { return s == null ? "" : s.trim(); }
+
+            private static String clean(String s) {
+              s = nz(s);
+              return s.equalsIgnoreCase("<unknown>") || s.equalsIgnoreCase("unknown") ? "" : s;
+            }
+
+            private static String encodePath(String rel) {
+              try {
+                String[] segs = rel.split("/");
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < segs.length; i++) {
+                  if (i > 0) sb.append('/');
+                  sb.append(URLEncoder.encode(segs[i], "UTF-8").replace("+", "%20"));
+                }
+                return sb.toString();
+              } catch (Exception e) { return rel; }
+            }
+
+            private static Set<String> lrcBases(File dir, Map<String, Set<String>> cacheMap) {
+              String key = dir.getAbsolutePath();
+              Set<String> s = cacheMap.get(key);
+              if (s != null) return s;
+              s = new HashSet<>();
+              File[] fs = dir.listFiles();
+              if (fs != null) for (File x : fs) {
+                String n = x.getName();
+                if (n.toLowerCase().endsWith(".lrc")) s.add(n.substring(0, n.length() - 4).trim().toLowerCase());
+              }
+              cacheMap.put(key, s);
+              return s;
+            }
+
+            private static JSONObject entry(String rel, File f, long size, long mod, JSONObject meta, Map<String, Set<String>> lc) throws Exception {
+              String name = f.getName();
+              int d = name.lastIndexOf('.');
+              String baseName = (d > 0 ? name.substring(0, d) : name).trim();
+              String ext = d > 0 ? name.substring(d + 1).toLowerCase() : "";
+              String enc = encodePath(rel);
+              JSONObject o = new JSONObject();
+              o.put("id", rel);
+              o.put("name", name);
+              o.put("baseName", baseName);
+              o.put("ext", ext);
+              o.put("size", size);
+              o.put("lastModified", mod);
+              o.put("url", PH + "/f/" + enc);
+              o.put("artUrl", PH + "/__art__/" + enc);
+              o.put("isDownload", rel.startsWith("Music8481/"));
+              int sl = rel.lastIndexOf('/');
+              o.put("folder", sl > 0 ? rel.substring(0, sl) : "");
+              File par = f.getParentFile();
+              o.put("hasLyrics", par != null && lrcBases(par, lc).contains(baseName.toLowerCase()));
+              if (meta != null) o.put("meta", meta);
+              return o;
+            }
+
+            private static void walk(File dir, int depth, String ep, List<JSONObject> out, Set<String> seen, Map<String, Set<String>> lc) throws Exception {
+              if (dir == null || depth < 0 || out.size() >= 10000) return;
+              File[] fs = dir.listFiles();
+              if (fs == null) return;
+              for (File f : fs) {
+                String n = f.getName();
+                if (n.startsWith(".")) continue;
+                if (f.isDirectory()) {
+                  if (!n.equalsIgnoreCase("Android")) walk(f, depth - 1, ep, out, seen, lc);
+                } else {
+                  int d = n.lastIndexOf('.');
+                  if (d <= 0 || !isAudio(n.substring(d + 1).toLowerCase()) || f.length() < 61440) continue;
+                  String p = f.getAbsolutePath();
+                  if (!p.startsWith(ep) || !seen.add(p)) continue;
+                  out.add(entry(p.substring(ep.length()), f, f.length(), f.lastModified(), null, lc));
+                }
+              }
+            }
+
+            private static String build(Context c) throws Exception {
+              String ep = Environment.getExternalStorageDirectory().getAbsolutePath() + "/";
+              List<JSONObject> out = new ArrayList<>();
+              Set<String> seen = new HashSet<>();
+              Map<String, Set<String>> lc = new HashMap<>();
+
+              List<String> cols = new ArrayList<>();
+              cols.add(MediaStore.Audio.Media.DATA);
+              cols.add(MediaStore.Audio.Media.TITLE);
+              cols.add(MediaStore.Audio.Media.ARTIST);
+              cols.add(MediaStore.Audio.Media.ALBUM);
+              cols.add(MediaStore.Audio.Media.DURATION);
+              cols.add(MediaStore.Audio.Media.SIZE);
+              cols.add(MediaStore.Audio.Media.DATE_MODIFIED);
+              cols.add(MediaStore.Audio.Media.YEAR);
+              if (Build.VERSION.SDK_INT >= 30) {
+                cols.add(MediaStore.Audio.AudioColumns.GENRE);
+                cols.add(MediaStore.MediaColumns.BITRATE);
+              }
+              Cursor cur = null;
+              try {
+                cur = c.getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, cols.toArray(new String[0]),
+                  MediaStore.Audio.Media.SIZE + ">=?", new String[]{"61440"}, MediaStore.Audio.Media.DATE_MODIFIED + " DESC");
+                if (cur != null) {
+                  int iP = cur.getColumnIndex(MediaStore.Audio.Media.DATA), iT = cur.getColumnIndex(MediaStore.Audio.Media.TITLE),
+                    iA = cur.getColumnIndex(MediaStore.Audio.Media.ARTIST), iAl = cur.getColumnIndex(MediaStore.Audio.Media.ALBUM),
+                    iDu = cur.getColumnIndex(MediaStore.Audio.Media.DURATION), iS = cur.getColumnIndex(MediaStore.Audio.Media.SIZE),
+                    iM = cur.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED), iY = cur.getColumnIndex(MediaStore.Audio.Media.YEAR),
+                    iG = cur.getColumnIndex("genre"), iB = cur.getColumnIndex("bitrate");
+                  while (cur.moveToNext() && out.size() < 10000) {
+                    String path = cur.getString(iP);
+                    if (path == null || !path.startsWith(ep)) continue;
+                    String rel = path.substring(ep.length());
+                    if (!inRoots(rel)) continue;
+                    int dot = rel.lastIndexOf('.');
+                    if (dot <= 0 || !isAudio(rel.substring(dot + 1).toLowerCase())) continue;
+                    File f = new File(path);
+                    if (!f.isFile() || !seen.add(path)) continue;
+                    JSONObject m = new JSONObject();
+                    m.put("title", nz(cur.getString(iT)));
+                    m.put("artist", clean(cur.getString(iA)));
+                    String album = clean(cur.getString(iAl));
+                    File par = f.getParentFile();
+                    if (par != null && album.equalsIgnoreCase(par.getName())) album = "";
+                    m.put("album", album);
+                    m.put("duration", cur.getLong(iDu) / 1000.0);
+                    int yr = cur.getInt(iY);
+                    m.put("year", yr > 0 ? String.valueOf(yr) : "");
+                    m.put("genre", iG >= 0 ? nz(cur.getString(iG)) : "");
+                    m.put("bitrate", iB >= 0 ? cur.getLong(iB) : 0);
+                    m.put("hasArt", true);
+                    out.add(entry(rel, f, cur.getLong(iS), cur.getLong(iM) * 1000L, m, lc));
+                  }
+                }
+              } catch (Exception ignored) {
+              } finally {
+                try { if (cur != null) cur.close(); } catch (Exception ignored) {}
+              }
+
+              // files not yet in MediaStore (fresh downloads / USB copies) -> JS indexes them lazily
+              for (String r : QUICK) walk(new File(ep + r), 3, ep, out, seen, lc);
+              // MediaStore unavailable / empty -> old folder walk
+              if (out.isEmpty()) for (String r : ROOTS) walk(new File(ep + r), 3, ep, out, seen, lc);
+              if (out.isEmpty()) return null;
+
+              Collections.sort(out, (a, b) -> Long.compare(b.optLong("lastModified"), a.optLong("lastModified")));
+              JSONArray arr = new JSONArray();
+              for (JSONObject o : out) arr.put(o);
+              return arr.toString().replace("\u2028", "\\u2028").replace("\u2029", "\\u2029");
+            }
+
+            static String lyrics(File f) {
+              try {
+                File dir = f.getParentFile();
+                if (dir == null) return "";
+                String n = f.getName();
+                int d = n.lastIndexOf('.');
+                String base = (d > 0 ? n.substring(0, d) : n).trim().toLowerCase();
+                File[] fs = dir.listFiles();
+                if (fs == null) return "";
+                for (File x : fs) {
+                  String xn = x.getName();
+                  if (xn.toLowerCase().endsWith(".lrc") && xn.substring(0, xn.length() - 4).trim().toLowerCase().equals(base)) {
+                    return new String(readAll(x), StandardCharsets.UTF_8);
+                  }
+                }
+              } catch (Exception ignored) {}
+              return "";
+            }
+
+            private static byte[] readAll(File f) throws Exception {
+              try (FileInputStream in = new FileInputStream(f)) {
+                byte[] b = new byte[(int) f.length()];
+                int off = 0;
+                while (off < b.length) { int r = in.read(b, off, b.length - off); if (r < 0) break; off += r; }
+                return b;
+              }
+            }
+
+            private static String md5(String s) throws Exception {
+              byte[] h = MessageDigest.getInstance("MD5").digest(s.getBytes(StandardCharsets.UTF_8));
+              StringBuilder sb = new StringBuilder();
+              for (byte b : h) sb.append(String.format("%02x", b));
+              return sb.toString();
+            }
+
+            /** Embedded cover art, decoded once, resized to <= max px and cached on disk as JPEG. */
+            static byte[] thumb(Context c, File f, String rel, int max) {
+              try {
+                File dir = new File(c.getCacheDir(), "art2");
+                if (!dir.exists()) dir.mkdirs();
+                String key = md5(rel + "|" + f.length() + "|" + f.lastModified() + "|" + max);
+                File jpg = new File(dir, key + ".jpg"), none = new File(dir, key + ".none");
+                if (jpg.isFile()) return readAll(jpg);
+                if (none.isFile()) return null;
+                byte[] raw = null;
+                MediaMetadataRetriever m = new MediaMetadataRetriever();
+                try { m.setDataSource(f.getAbsolutePath()); raw = m.getEmbeddedPicture(); } catch (Exception ignored) {}
+                finally { try { m.release(); } catch (Exception ignored) {} }
+                if (raw == null || raw.length < 64) { try { none.createNewFile(); } catch (Exception ignored) {} return null; }
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                BitmapFactory.decodeByteArray(raw, 0, raw.length, o);
+                int s = 1, mx = Math.max(o.outWidth, o.outHeight);
+                while (mx / (s * 2) >= max) s *= 2;
+                BitmapFactory.Options o2 = new BitmapFactory.Options();
+                o2.inSampleSize = s;
+                Bitmap b = BitmapFactory.decodeByteArray(raw, 0, raw.length, o2);
+                if (b == null) { try { none.createNewFile(); } catch (Exception ignored) {} return null; }
+                int bw = b.getWidth(), bh = b.getHeight(), bm = Math.max(bw, bh);
+                if (bm > max) {
+                  float k = max / (float) bm;
+                  Bitmap sc = Bitmap.createScaledBitmap(b, Math.round(bw * k), Math.round(bh * k), true);
+                  if (sc != b) { b.recycle(); b = sc; }
+                }
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                b.compress(Bitmap.CompressFormat.JPEG, 86, bo);
+                b.recycle();
+                byte[] outB = bo.toByteArray();
+                File tmp = new File(dir, key + ".tmp" + Thread.currentThread().getId());
+                try (FileOutputStream fo = new FileOutputStream(tmp)) { fo.write(outB); }
+                if (!tmp.renameTo(jpg)) tmp.delete();
+                return outB;
+              } catch (Throwable t) {
+                return null;
+              }
+            }
+
+            /** Current output device + native sample rate (used by the JS audio engine). */
+            static String audioInfo(Context c) {
+              JSONObject o = new JSONObject();
+              try {
+                AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+                int rate = 0, frames = 0;
+                try { rate = Integer.parseInt(am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)); } catch (Exception ignored) {}
+                try { frames = Integer.parseInt(am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)); } catch (Exception ignored) {}
+                String type = "speaker", label = "Phone speaker";
+                int best = -1, maxRate = rate;
+                boolean hires = false;
+                if (Build.VERSION.SDK_INT >= 23) {
+                  for (AudioDeviceInfo dv : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                    int ty = dv.getType(), sc = -1;
+                    String t2 = null, l2 = null;
+                    if (ty == 11 || ty == 22) { sc = 4; t2 = "usb"; l2 = "USB audio"; }
+                    else if (ty == 3 || ty == 4 || ty == 5 || ty == 6) { sc = 3; t2 = "wired"; l2 = "Wired headphones"; }
+                    else if (ty == 8 || ty == 26 || ty == 27 || ty == 23) { sc = 2; t2 = "bluetooth"; l2 = "Bluetooth"; }
+                    else if (ty == 9 || ty == 10) { sc = 1; t2 = "other"; l2 = "HDMI / external"; }
+                    if (sc > best) {
+                      best = sc; type = t2; label = l2;
+                      int mr = rate;
+                      for (int r : dv.getSampleRates()) mr = Math.max(mr, r);
+                      boolean deep = false;
+                      for (int e : dv.getEncodings()) if (e == 4 || e == 21 || e == 22) deep = true;
+                      maxRate = mr;
+                      hires = (sc >= 3) && (mr >= 88200 || deep);
+                    }
+                  }
+                }
+                o.put("type", type); o.put("label", label); o.put("rate", rate);
+                o.put("frames", frames); o.put("maxRate", maxRate); o.put("hires", hires);
+              } catch (Exception ignored) {}
+              return o.toString();
+            }
+          }
+          EOF
+
+          cat <<'PATCHES_EOF' > patches.txt
+          @@FILE android/app/src/main/java/com/ayush/music/MainActivity.java
+          @@FIND
+          INSTANCE = this;
+          @@WITH
+          INSTANCE = this;
+          showSplash();
+          @@END
+          @@FIND
+          localServer.start();
+          @@WITH
+          localServer.start();
+          Library.prewarm(this);
+          @@END
+          @@FIND
+          private File getMusic8481Directory() {
+          @@WITH
+          private SplashView splash;
+          private long splashStart = 0;
+          private boolean splashGone = false;
+
+          private void showSplash() {
+              try {
+                  splash = new SplashView(this);
+                  ViewGroup content = findViewById(android.R.id.content);
+                  content.addView(splash, new ViewGroup.LayoutParams(-1, -1));
+                  splashStart = SystemClock.uptimeMillis();
+                  splash.postDelayed(this::dismissSplash, 3000);
+              } catch (Exception e) {
+                  splash = null;
+              }
+          }
+
+          private void dismissSplash() {
+              final SplashView s = splash;
+              if (s == null || splashGone) return;
+              splashGone = true;
+              long wait = Math.max(0, 700 - (SystemClock.uptimeMillis() - splashStart));
+              s.postDelayed(() -> s.animate().alpha(0f).setDuration(260).withEndAction(() -> {
+                  try {
+                      ViewGroup p = (ViewGroup) s.getParent();
+                      if (p != null) p.removeView(s);
+                  } catch (Exception ignored) {}
+                  splash = null;
+              }).start(), wait);
+          }
+
+          private File getMusic8481Directory() {
+          @@END
+          @@FIND
+          private void serveArt(OutputStream out, String rel, boolean head) throws IOException {
+          @@WITH
+          private void serveArt(OutputStream out, String rel, boolean head) throws IOException {
+              if (true) {
+                  File mf = findLocalMediaFile(rel);
+                  byte[] tb = mf == null ? null : Library.thumb(MainActivity.this, mf, rel, 800);
+                  if (tb == null) { writeHead(out, 404, "Not Found", "text/plain", 0, null); out.flush(); return; }
+                  writeHead(out, 200, "OK", "image/jpeg", tb.length, null);
+                  if (!head) out.write(tb);
+                  out.flush();
+                  return;
+              }
+          @@END
+          @@FIND
+          public String getDownloadedFiles() {
+          @@WITH
+          public String getDownloadedFiles() {
+              if (true) return Library.listJson(MainActivity.this, localServer != null ? localServer.base() : "");
+          @@END
+          @@FIND
+          // Full metadata (+ .lrc content) for ONE track - used when a song is played
+          @@WITH
+          @JavascriptInterface
+          public String getLyrics(String rel) {
+              try { File lf = findLocalMediaFile(rel); return lf == null ? "" : Library.lyrics(lf); } catch (Exception e) { return ""; }
+          }
+
+          @JavascriptInterface
+          public String getLibraryVersion() { return Library.version(MainActivity.this); }
+
+          @JavascriptInterface
+          public String getAudioInfo() { return Library.audioInfo(MainActivity.this); }
+
+          // Full metadata (+ .lrc content) for ONE track - used when a song is played
+          @@END
+          @@FIND
+          MediaScannerConnection.scanFile(MainActivity.this, new String[]{targetFile.getAbsolutePath()}, null, null);
+          @@WITH
+          MediaScannerConnection.scanFile(MainActivity.this, new String[]{targetFile.getAbsolutePath()}, null, (p, u) -> Library.invalidate());
+          @@END
+          @@FIND
+          MediaScannerConnection.scanFile(MainActivity.this, new String[]{f.getAbsolutePath()}, null, null);
+          @@WITH
+          Library.invalidate();
+          MediaScannerConnection.scanFile(MainActivity.this, new String[]{f.getAbsolutePath()}, null, (p, u) -> Library.invalidate());
+          @@END
+          @@FIND
+          super.onPageCommitVisible(view, url);
+          @@WITH
+          super.onPageCommitVisible(view, url);
+          dismissSplash();
+          @@END
+          @@FIND
+          super.onPageFinished(view, url);
+          @@WITH
+          super.onPageFinished(view, url);
+          dismissSplash();
+          @@END
+          @@FILE www/error.html
+          @@FIND
+          if (c && c.k === ixKey(o)) o.m = c.m; else todo.push(o.id);
+          @@WITH
+          if (o.meta) { o.m = o.meta; } else if (c && c.k === ixKey(o)) o.m = c.m; else todo.push(o.id);
+          @@END
+          @@FIND
+          try { t.m = JSON.parse(A.getTrackMeta(t.id) || '{}'); } catch (e) { t.m = {}; }
+          @@WITH
+          if (t.m) { t.m = Object.assign({}, t.m); try { t.m.lrcContent = (t.hasLyrics && A.getLyrics) ? (A.getLyrics(t.id) || '') : ''; } catch (e) { t.m.lrcContent = ''; } }
+          else { try { t.m = JSON.parse(A.getTrackMeta(t.id) || '{}'); } catch (e) { t.m = {}; } }
+          @@END
+          @@FIND
+          lastRaw = rawStr;
+          @@WITH
+          lastRaw = rawStr; try { libVer = A.getLibraryVersion ? A.getLibraryVersion() : ''; } catch (e) { libVer = ''; }
+          @@END
+          @@FIND
+          try { var s = A.getDownloadedFiles() || '[]'; if (s !== lastRaw) { loadTracks(); refreshDetail(); } } catch (e) {}
+          @@WITH
+          try { if (A.getLibraryVersion) { var lv = A.getLibraryVersion(); if (lv && lv === libVer) return; } var s = A.getDownloadedFiles() || '[]'; if (s !== lastRaw) { loadTracks(); refreshDetail(); } } catch (e) {}
+          @@END
+          @@FIND
+          '<img src="' + t.artUrl + '" onerror="this.remove()">'
+          @@WITH
+          '<img src="' + t.artUrl + '" loading="lazy" decoding="async" alt="" data-l="' + esc((t.title || '?').charAt(0).toUpperCase()) + '" onerror="__artErr(this)">'
+          @@END
+          @@FIND
+          nativeUpdate(t); renderContinue(); saveQueue();
+          @@WITH
+          nativeUpdate(t); renderContinue(); saveQueue(); warmNext();
+          @@END
+          @@FIND
+          /* ================= boot ================= */
+          @@WITH
+          /* ================= PRO: art fallback + next-track warm-up ================= */
+          var libVer = '';
+          var PRO_ENGINE = true; /* set to false to disable the Web Audio engine completely */
+          window.__artErr = function (im) {
+            try { var p = im.parentNode; if (!p) return; var s = document.createElement('span'); s.textContent = im.getAttribute('data-l') || '\u266A'; p.replaceChild(s, im); } catch (e) {}
+          };
+          var warmT = null;
+          function warmNext() {
+            clearTimeout(warmT);
+            warmT = setTimeout(function () {
+              if (document.hidden || !window.fetch) return;
+              var ni = order[pos + 1], n = ni !== undefined ? tracks[ni] : null; if (!n) return;
+              try {
+                fetch(n.url, { headers: { Range: 'bytes=0-524287' } }).then(function (r) { return r.arrayBuffer(); }).catch(function () {});
+                if (n.hasArt) { var im = new Image(); im.src = n.artUrl; }
+              } catch (e) {}
+            }, 700);
+          }
+
+          /* ================= PRO: audio engine (EQ + normalize + limiter + spatial) ================= */
+          var FX = { on: true, preset: 'Flat', bands: [0, 0, 0, 0, 0, 0], norm: true, level: 'Normal', spatial: false, auto: true };
+          try { var fxs = JSON.parse(localStorage.getItem('o_fx') || '{}'); for (var fk in fxs) FX[fk] = fxs[fk]; } catch (e) {}
+          var FX_F = [60, 150, 400, 1000, 2400, 15000], FX_T = ['lowshelf', 'peaking', 'peaking', 'peaking', 'peaking', 'highshelf'], FX_L = ['60 Hz', '150 Hz', '400 Hz', '1 kHz', '2.4 kHz', '15 kHz'];
+          var PRESETS = {
+            'Flat': [0, 0, 0, 0, 0, 0], 'Bass Booster': [6, 5, 3, 0, 0, 0], 'Bass Reducer': [-6, -4, -2, 0, 0, 0],
+            'Treble Booster': [0, 0, 0, 1, 4, 6], 'Vocal Booster': [-2, -2, 1, 4, 3, 1], 'Loudness': [5, 2, 0, 0, 1, 4],
+            'Rock': [4, 3, -1, -2, 2, 4], 'Pop': [-1, 1, 3, 3, 1, -1], 'Hip-Hop': [5, 4, 1, -1, 1, 2],
+            'Electronic': [5, 3, 0, -2, 2, 4], 'Acoustic': [3, 2, 1, 1, 2, 2], 'Classical': [3, 2, 0, -1, 2, 3]
+          };
+          var DEVTRIM = { speaker: [-4, -1, 0, 0, 1, 1], wired: [0, 0, 0, 0, 0, 0], usb: [0, 0, 0, 0, 0, 0], bluetooth: [0, 0, 0, 0, 0, 0], other: [0, 0, 0, 0, 0, 0] };
+          var dev = { type: 'speaker', label: 'Phone speaker', rate: 0, maxRate: 0, hires: false };
+          var AE = { ctx: null, ok: false };
+          function dbl(db) { return Math.pow(10, db / 20); }
+          function fxSave() { try { localStorage.setItem('o_fx', JSON.stringify(FX)); } catch (e) {} }
+          function effBands() {
+            if (!FX.on) return [0, 0, 0, 0, 0, 0];
+            var b = FX.bands.slice(), tr = DEVTRIM[dev.type] || DEVTRIM.other;
+            if (FX.auto) for (var i = 0; i < 6; i++) b[i] += tr[i];
+            return b;
+          }
+          function aeApply() {
+            if (!AE.ok) return;
+            var c = AE.ctx, t = c.currentTime, g = effBands(), mx = 0, i;
+            for (i = 0; i < 6; i++) { if (g[i] > mx) mx = g[i]; AE.eq[i].gain.setTargetAtTime(g[i], t, 0.04); }
+            AE.pre.gain.setTargetAtTime(dbl(-mx), t, 0.04);
+            AE.side.gain.setTargetAtTime(0.5 * ((FX.on && FX.spatial) ? 1.8 : 1), t, 0.05);
+            var nm = FX.on && FX.norm;
+            AE.comp.threshold.value = nm ? -22 : 0; AE.comp.knee.value = nm ? 24 : 0; AE.comp.ratio.value = nm ? 3 : 1;
+            AE.comp.attack.value = 0.01; AE.comp.release.value = 0.25;
+            var lv = nm ? ({ Quiet: -4, Normal: 0, Loud: 3 })[FX.level] || 0 : 0;
+            AE.mk.gain.setTargetAtTime(dbl(lv), t, 0.08);
+          }
+          function aeResume() { try { if (AE.ctx && AE.ctx.state !== 'running') AE.ctx.resume().catch(function () {}); } catch (e) {} }
+          function aeInit() {
+            if (!PRO_ENGINE) return;
+            var ctx = null;
+            try {
+              var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+              aud.crossOrigin = 'anonymous';
+              var o = { latencyHint: 'playback' }; if (dev.rate >= 8000 && dev.rate <= 192000) o.sampleRate = dev.rate;
+              try { ctx = new AC(o); } catch (e) { ctx = new AC({ latencyHint: 'playback' }); }
+              var src = ctx.createMediaElementSource(aud), pre = ctx.createGain();
+              var eq = FX_F.map(function (f, i) { var b = ctx.createBiquadFilter(); b.type = FX_T[i]; b.frequency.value = f; b.Q.value = (i === 0 || i === 5) ? 0.71 : 1.0; b.gain.value = 0; return b; });
+              var split = ctx.createChannelSplitter(2), merge = ctx.createChannelMerger(2);
+              var mid = ctx.createGain(), side = ctx.createGain(), inv1 = ctx.createGain(), inv2 = ctx.createGain();
+              mid.gain.value = 0.5; side.gain.value = 0.5; inv1.gain.value = -1; inv2.gain.value = -1;
+              var comp = ctx.createDynamicsCompressor(), mk = ctx.createGain(), lim = ctx.createDynamicsCompressor();
+              lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.002; lim.release.value = 0.12;
+              src.connect(pre); var n = pre; eq.forEach(function (b) { n.connect(b); n = b; }); n.connect(split);
+              split.connect(mid, 0); split.connect(mid, 1);
+              split.connect(side, 0); split.connect(inv1, 1); inv1.connect(side);
+              mid.connect(merge, 0, 0); side.connect(merge, 0, 0);
+              mid.connect(merge, 0, 1); side.connect(inv2); inv2.connect(merge, 0, 1);
+              merge.connect(comp); comp.connect(mk); mk.connect(lim); lim.connect(ctx.destination);
+              AE.ctx = ctx; AE.eq = eq; AE.pre = pre; AE.side = side; AE.comp = comp; AE.mk = mk; AE.lim = lim; AE.ok = true;
+              ctx.onstatechange = function () { if (!aud.paused) aeResume(); };
+              aeApply();
+            } catch (e) { AE.ok = false; try { if (ctx) ctx.close(); } catch (x) {} }
+          }
+          function devRefresh() {
+            try { if (A && A.getAudioInfo) { var d = JSON.parse(A.getAudioInfo() || '{}'); if (d && d.type) dev = d; } } catch (e) {}
+            aeApply(); fxInfo();
+          }
+          devRefresh(); aeInit();
+          aud.addEventListener('play', aeResume); aud.addEventListener('playing', aeResume);
+          ['touchstart', 'click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, aeResume, { passive: true, capture: true }); });
+          setInterval(function () { if (AE.ok && !aud.paused && AE.ctx.state !== 'running') aeResume(); }, 1500);
+          setInterval(function () { if (!document.hidden) devRefresh(); }, 4000);
+
+          /* ---- settings UI (injected into the existing settings sheet) ---- */
+          function fxRow(ic, title, sub, id) {
+            return '<div class="s-row"><div class="li"><div class="ic">' + ic + '</div><div><b>' + title + '</b><small>' + sub + '</small></div></div><button class="tg" id="' + id + '"><i></i></button></div>';
+          }
+          function fxInfo() {
+            var el = $('#fxInfo'); if (!el) return;
+            var sr = AE.ok ? AE.ctx.sampleRate : (dev.rate || 0);
+            el.textContent = 'Output: ' + (dev.label || 'Device') + (sr ? ' \u00B7 ' + (Math.round(sr / 100) / 10) + ' kHz' : '') + (dev.hires ? ' \u00B7 Hi-Res capable' : '') + (AE.ok ? '' : ' \u00B7 engine unavailable');
+          }
+          function syncFxUI() {
+            if (!$('#fxSec')) return;
+            var set = function (id, v) { var e = $('#' + id); if (e) e.classList.toggle('on', !!v); };
+            set('tgFx', FX.on); set('tgNorm', FX.norm); set('tgSpat', FX.spatial); set('tgAuto', FX.auto);
+            $('#fxBody').classList.toggle('fx-off', !FX.on);
+            $$('#fxChips .fxp').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-p') === FX.preset); });
+            $$('#fxSec .fxr').forEach(function (r) { var i = +r.getAttribute('data-b'); r.value = FX.bands[i]; r.parentNode.querySelector('em').textContent = (FX.bands[i] > 0 ? '+' : '') + FX.bands[i] + ' dB'; });
+            $$('#segLvl button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === FX.level); });
+          }
+          function buildFxUI() {
+            var body = $('#setSheet .s-body'); if (!body || $('#fxSec')) return;
+            var css = document.createElement('style');
+            css.textContent = '.fx-chips{display:flex;gap:8px;overflow-x:auto;padding:0 2px 2px;scrollbar-width:none}.fx-chips::-webkit-scrollbar{display:none}' +
+              '.fxp{flex:none;padding:8px 14px;border-radius:99px;background:rgba(255,255,255,.08);font-size:12.5px;font-weight:800;color:rgba(255,255,255,.75);white-space:nowrap}.fxp.on{background:var(--accent);color:#000}' +
+              '.fx-b{display:grid;grid-template-columns:54px 1fr 52px;align-items:center;gap:10px}.fx-b span,.fx-b em{font-size:12px;font-weight:800;color:rgba(255,255,255,.6);font-style:normal}.fx-b em{text-align:right;font-variant-numeric:tabular-nums}' +
+              'input[type=range].fxr{height:24px;background:transparent}input[type=range].fxr::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:rgba(255,255,255,.2)}' +
+              'input[type=range].fxr::-webkit-slider-thumb{width:20px;height:20px;margin-top:-8px;background:var(--accent);box-shadow:0 2px 6px rgba(0,0,0,.5)}' +
+              '.fx-info{font-size:12px;font-weight:700;color:rgba(255,255,255,.6);line-height:1.5}.fx-off{opacity:.4;pointer-events:none}';
+            document.head.appendChild(css);
+            var sec = document.createElement('div'); sec.className = 's-sec'; sec.id = 'fxSec';
+            var chips = Object.keys(PRESETS).map(function (n) { return '<button class="fxp" data-p="' + n + '">' + n + '</button>'; }).join('');
+            var sl = FX_L.map(function (l, i) { return '<div class="fx-b"><span>' + l + '</span><input type="range" class="fxr" min="-12" max="12" step="0.5" value="0" data-b="' + i + '"><em>0 dB</em></div>'; }).join('');
+            sec.innerHTML = '<div class="s-lbl">' + IC.spark(13) + ' Sound enhancement</div><div class="s-card">' +
+              fxRow(IC.spark(18), 'Audio enhancer', 'Equalizer, loudness and limiter', 'tgFx') +
+              '<div class="s-fonts" id="fxBody"><div class="fx-info" id="fxInfo"></div><div class="fx-chips" id="fxChips">' + chips + '</div>' + sl +
+              '<div><p>Volume level</p><div class="seg" id="segLvl"><button data-v="Quiet">Quiet</button><button data-v="Normal">Normal</button><button data-v="Loud">Loud</button></div></div></div>' +
+              fxRow(IC.gauge(18), 'Normalize volume', 'Same loudness for every song', 'tgNorm') +
+              fxRow(IC.expand(18), 'Spatial widening', 'Wider stereo image', 'tgSpat') +
+              fxRow(IC.settings(18), 'Auto-tune for device', 'Adjusts sound for speaker or headphones', 'tgAuto') + '</div>';
+            body.appendChild(sec);
+            var tg = function (id, key) { $('#' + id).onclick = function () { FX[key] = !FX[key]; fxSave(); syncFxUI(); aeApply(); }; };
+            tg('tgFx', 'on'); tg('tgNorm', 'norm'); tg('tgSpat', 'spatial'); tg('tgAuto', 'auto');
+            $('#fxChips').addEventListener('click', function (e) { var b = e.target.closest('.fxp'); if (!b) return; var n = b.getAttribute('data-p'); FX.preset = n; FX.bands = PRESETS[n].slice(); fxSave(); syncFxUI(); aeApply(); });
+            $$('#fxSec .fxr').forEach(function (r) {
+              r.addEventListener('input', function () { var i = +r.getAttribute('data-b'); FX.bands[i] = parseFloat(r.value); FX.preset = 'Custom'; r.parentNode.querySelector('em').textContent = (FX.bands[i] > 0 ? '+' : '') + FX.bands[i] + ' dB'; $$('#fxChips .fxp').forEach(function (b) { b.classList.remove('on'); }); aeApply(); });
+              r.addEventListener('change', fxSave);
+            });
+            $('#segLvl').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; FX.level = b.getAttribute('data-v'); fxSave(); syncFxUI(); aeApply(); });
+            $('#sHead').innerHTML = IC.settings(24) + ' Player settings';
+            syncFxUI(); fxInfo();
+          }
+          buildFxUI();
+
+          /* ================= boot ================= */
+          @@END
+          PATCHES_EOF
+
+          cat <<'EOF' > apply-patches.js
+          const fs = require('fs');
+          const txt = fs.readFileSync('patches.txt', 'utf8');
+          txt.split(/^@@FILE /m).slice(1).forEach(block => {
+            const nl = block.indexOf('\n');
+            const file = block.slice(0, nl).trim();
+            let src = fs.readFileSync(file, 'utf8');
+            block.slice(nl + 1).split(/^@@FIND\n/m).slice(1).forEach(edit => {
+              const parts = edit.split(/^@@WITH\n/m);
+              const find = parts[0].replace(/\n$/, '');
+              const repl = parts[1].split(/^@@END\n?/m)[0].replace(/\n$/, '');
+              const n = src.split(find).length - 1;
+              if (n !== 1) { console.error('PATCH FAILED (' + n + ' matches): ' + find); process.exit(1); }
+              src = src.split(find).join(repl);
+            });
+            fs.writeFileSync(file, src);
+            console.log('patched ' + file);
+          });
+          EOF
+          node apply-patches.js
+
       - name: Fix Kotlin Duplicate Classes (Gradle Bug)
         run: |
           cat <<'EOF' >> android/app/build.gradle
@@ -3853,8 +4535,6 @@ jobs:
       - name: Fix Gradle Daemon & Memory Issues (CI Stability)
         run: |
           echo "org.gradle.daemon=false" >> android/gradle.properties
-          echo "org.gradle.parallel=true" >> android/gradle.properties
-          echo "org.gradle.caching=true" >> android/gradle.properties
           echo "org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
 
       - name: Generate Android Keystore (For App Signing)
