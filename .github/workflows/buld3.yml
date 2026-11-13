@@ -6026,7 +6026,7 @@ jobs:
           P.write_text(t, encoding='utf-8')
           print('update 5 applied')
           PYEOF
-   - name: Apply update 6 (mobile phone UI + launcher, one APK for TV and mobile)
+      - name: Apply update 6 (mobile phone UI + launcher, one APK for TV and mobile)
         run: |
           set -e
           R=app/src/main/res
