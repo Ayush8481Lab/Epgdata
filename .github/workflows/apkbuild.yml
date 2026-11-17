@@ -1,4 +1,4 @@
-name: Build StarGuard8481 APK
+name: Build hostaradsguard APK
 
 # Put this file at: .github/workflows/Apk.yml
 # Run it from the Actions tab (Run workflow) or by pushing to main.
@@ -7,7 +7,7 @@ name: Build StarGuard8481 APK
 # ---------------------------------------------------------------------------
 # WHERE TO EDIT
 #   1) Block list  -> BLOCK_DOMAINS_DEFAULT below (JSON array, one domain per line)
-#      PRIVATE option (recommended if the repo is pulic): add a repository secret
+#      PRIVATE option (recommended if the repo is public): add a repository secret
 #      named BLOCK_DOMAINS (Settings > Secrets and variables > Actions) with the
 #      same JSON array. If the secret exists it overrides the list below.
 #   2) Logos       -> LOGO_SQUARE_URL (1:1 app icon) and LOGO_WIDE_URL (16:9 TV banner)
@@ -35,7 +35,7 @@ env:
     "service.hotstar.com",
     "hspx.hotstar.com",
     "usersvc.hotstar.com"
-  ]
+    ]
 
 jobs:
   build:
@@ -63,7 +63,7 @@ jobs:
 
       - name: Create Gradle project files
         run: |
-          mkdir -p app/src/main/java/com/ayush/StarGuard8481
+          mkdir -p app/src/main/java/com/ayush/hostaradsguard
           mkdir -p app/src/main/res/drawable-nodpi
 
           cat > settings.gradle <<'EOF'
@@ -74,7 +74,7 @@ jobs:
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories { google(); mavenCentral() }
           }
-          rootProject.name = "StarGuard8481"
+          rootProject.name = "hostaradsguard"
           include ':app'
           EOF
 
@@ -94,14 +94,14 @@ jobs:
               id 'com.android.application'
           }
           android {
-              namespace 'com.ayush.StarGuard8481'
+              namespace 'com.ayush.hostaradsguard'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.ayush.StarGuard8481'
+                  applicationId 'com.ayush.hostaradsguard'
                   minSdk 22
                   targetSdk 33
-                  versionCode 3
-                  versionName '2.1'
+                  versionCode 4
+                  versionName '2.2'
               }
               signingConfigs {
                   release {
@@ -190,6 +190,24 @@ jobs:
                 if wd else Image.new('RGB', (640, 360), (0x1B, 0x2A, 0x41)))
           sq.save(RES + 'ic_launcher.png', optimize=True)   # 1:1  -> app icon / lists / settings
           wd.save(RES + 'banner.png', optimize=True)        # 16:9 -> Android TV launcher banner
+          import os
+          os.makedirs('app/src/main/res/mipmap-xxhdpi', exist_ok=True)
+          os.makedirs('app/src/main/res/mipmap-anydpi-v26', exist_ok=True)
+          os.makedirs('app/src/main/res/values', exist_ok=True)
+          sq.save('app/src/main/res/mipmap-xxhdpi/ic_launcher.png', optimize=True)  # phones / legacy
+          cols = [sq.getpixel(p) for p in [(4, 4), (507, 4), (4, 507), (507, 507)]]
+          r, g, b = [sum(c[i] for c in cols) // 4 for i in range(3)]
+          open('app/src/main/res/values/colors.xml', 'w').write(
+              '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+              '    <color name="icon_bg">#%02X%02X%02X</color>\n</resources>\n' % (r, g, b))
+          open('app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml', 'w').write(
+              '<?xml version="1.0" encoding="utf-8"?>\n'
+              '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+              '    <background android:drawable="@color/icon_bg"/>\n'
+              '    <foreground>\n'
+              '        <inset android:drawable="@drawable/ic_launcher" android:inset="14%"/>\n'
+              '    </foreground>\n'
+              '</adaptive-icon>\n')
           print('logos ready')
           PY
 
@@ -202,6 +220,8 @@ jobs:
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
               <uses-feature android:name="android.software.leanback" android:required="false" />
               <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -209,9 +229,10 @@ jobs:
               <application
                   android:allowBackup="false"
                   android:usesCleartextTraffic="false"
-                  android:icon="@drawable/ic_launcher"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher"
                   android:banner="@drawable/banner"
-                  android:label="StarGuard8481"
+                  android:label="hostaradsguard"
                   android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
                   <activity
@@ -253,11 +274,11 @@ jobs:
 
       - name: Write Java source
         run: |
-          D=app/src/main/java/com/ayush/StarGuard8481
+          D=app/src/main/java/com/ayush/hostaradsguard
 
           # ---------------------------------------------------------------
           cat > $D/Blocklist.java <<'EOF'
-          package com.ayush.StarGuard8481;
+          package com.ayush.hostaradsguard;
 
           import java.security.MessageDigest;
           import java.util.Arrays;
@@ -324,7 +345,7 @@ jobs:
 
           # ---------------------------------------------------------------
           cat > $D/Stats.java <<'EOF'
-          package com.ayush.StarGuard8481;
+          package com.ayush.hostaradsguard;
 
           import android.content.Context;
           import android.content.SharedPreferences;
@@ -400,7 +421,7 @@ jobs:
 
           # ---------------------------------------------------------------
           cat > $D/DnsVpnService.java <<'EOF'
-          package com.ayush.StarGuard8481;
+          package com.ayush.hostaradsguard;
 
           import android.app.Notification;
           import android.app.NotificationChannel;
@@ -423,11 +444,12 @@ jobs:
           import java.util.concurrent.TimeUnit;
 
           public class DnsVpnService extends VpnService {
-              public static final String ACTION_STOP = "com.ayush.StarGuard8481.STOP";
+              public static final String ACTION_STOP = "com.ayush.hostaradsguard.STOP";
               public static volatile boolean running = false;
 
-              private static final String[] UPSTREAM = {"1.1.1.1", "8.8.8.8"};
-              private static final int UPSTREAM_TIMEOUT_MS = 2000;
+              private static final String[] UPSTREAM = {"1.1.1.1", "8.8.8.8",
+            "2606:4700:4700::1111", "2001:4860:4860::8888"};
+              private static final int UPSTREAM_TIMEOUT_MS = 1500;
               private static final int MAX_IDLE_SOCKETS = 6;
 
               private final ConcurrentLinkedQueue<DatagramSocket> socks = new ConcurrentLinkedQueue<>();
@@ -460,7 +482,7 @@ jobs:
                   }
                   Notification.Builder nb = Build.VERSION.SDK_INT >= 26
                           ? new Notification.Builder(this, "dns") : new Notification.Builder(this);
-                  return nb.setContentTitle("StarGuard8481 is running")
+                  return nb.setContentTitle("hostaradsguard is running")
                           .setContentText("Ad blocking is active")
                           .setSmallIcon(android.R.drawable.ic_lock_lock)
                           .build();
@@ -470,10 +492,10 @@ jobs:
                   Stats.init(this);
                   try {
                       tun = new Builder()
-                              .setSession("StarGuard8481")
-                              .addAddress("10.0.0.2", 32)
-                              .addDnsServer("10.0.0.1")
-                              .addRoute("10.0.0.1", 32)   // only DNS traffic enters the tunnel
+                              .setSession("hostaradsguard")
+                              .addAddress("198.18.0.2", 32)
+                              .addDnsServer("198.18.0.1")
+                              .addRoute("198.18.0.1", 32)   // only DNS traffic enters the tunnel
                               .setMtu(1500)
                               .setBlocking(true)
                               .establish();
@@ -680,7 +702,7 @@ jobs:
 
           # ---------------------------------------------------------------
           cat > $D/KeepAliveJob.java <<'EOF'
-          package com.ayush.StarGuard8481;
+          package com.ayush.hostaradsguard;
 
           import android.app.job.JobInfo;
           import android.app.job.JobParameters;
@@ -754,7 +776,7 @@ jobs:
 
           # ---------------------------------------------------------------
           cat > $D/BootReceiver.java <<'EOF'
-          package com.ayush.StarGuard8481;
+          package com.ayush.hostaradsguard;
 
           import android.content.BroadcastReceiver;
           import android.content.Context;
@@ -783,25 +805,30 @@ jobs:
 
           # ---------------------------------------------------------------
           cat > $D/MainActivity.java <<'EOF'
-          package com.ayush.StarGuard8481;
+          package com.ayush.hostaradsguard;
 
           import android.app.Activity;
           import android.content.Intent;
+          import android.content.pm.PackageManager;
           import android.graphics.Color;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
           import android.graphics.drawable.StateListDrawable;
+          import android.net.Uri;
           import android.net.VpnService;
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.Looper;
+          import android.os.PowerManager;
+          import android.provider.Settings;
           import android.view.Gravity;
           import android.view.View;
           import android.view.ViewOutlineProvider;
           import android.widget.Button;
           import android.widget.ImageView;
           import android.widget.LinearLayout;
+          import android.widget.ScrollView;
           import android.widget.TextView;
           import java.text.NumberFormat;
 
@@ -813,8 +840,9 @@ jobs:
               private static final int RED = 0xFFE74C3C;
               private static final int GRAY = 0xFF2A3550;
 
+              private boolean compact;   // phones / small screens -> stacked layout
               private TextView state, nToday, n7, n30;
-              private Button btnOn, btnOff;
+              private Button btnOn, btnOff, btnBatt;
               private int lastMode = -1;
               private final Handler h = new Handler(Looper.getMainLooper());
               private final Runnable tick = new Runnable() {
@@ -842,7 +870,10 @@ jobs:
               }
 
               private void spacer(LinearLayout root, float weight) {
-                  root.addView(new View(this), new LinearLayout.LayoutParams(0, 0, weight));
+                  View v = new View(this);
+                  v.setMinimumHeight(dp(compact ? 14 : 12));
+                  root.addView(v, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, weight));
               }
 
               private void style(Button b, int fill) {
@@ -856,12 +887,13 @@ jobs:
               private Button makeButton(String text, View.OnClickListener l) {
                   Button b = new Button(this);
                   b.setText(text);
-                  b.setTextSize(22);
+                  b.setTextSize(compact ? 20 : 22);
                   b.setTextColor(Color.WHITE);
                   b.setTypeface(Typeface.DEFAULT_BOLD);
                   b.setAllCaps(false);
                   b.setStateListAnimator(null);
-                  b.setPadding(dp(56), dp(16), dp(56), dp(16));
+                  b.setMinHeight(dp(56));
+                  b.setPadding(dp(compact ? 16 : 56), dp(16), dp(compact ? 16 : 56), dp(16));
                   b.setFocusable(true);
                   b.setOnClickListener(l);
                   return b;
@@ -871,19 +903,25 @@ jobs:
                   LinearLayout c = new LinearLayout(this);
                   c.setOrientation(LinearLayout.VERTICAL);
                   c.setGravity(Gravity.CENTER);
-                  c.setPadding(dp(16), dp(26), dp(16), dp(26));
+                  c.setPadding(dp(16), dp(compact ? 18 : 26), dp(16), dp(compact ? 18 : 26));
                   c.setBackground(round(CARD, dp(22), 0, 0));
-                  TextView l = tv(label, 14, MUTED);
+                  TextView l = tv(label, 13, MUTED);
                   l.setLetterSpacing(0.12f);
-                  TextView n = tv("0", 46, Color.WHITE);
+                  TextView n = tv("0", compact ? 38 : 46, Color.WHITE);
                   n.setTypeface(Typeface.DEFAULT_BOLD);
                   TextView s = tv("ads blocked", 14, GREEN);
                   c.addView(l);
                   c.addView(n);
                   c.addView(s);
-                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
-                          LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                  lp.setMargins(dp(10), 0, dp(10), 0);
+                  LinearLayout.LayoutParams lp;
+                  if (compact) {
+                      lp = new LinearLayout.LayoutParams(
+                              LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                      lp.setMargins(0, dp(6), 0, dp(6));
+                  } else {
+                      lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                      lp.setMargins(dp(10), 0, dp(10), 0);
+                  }
                   row.addView(c, lp);
                   return n;
               }
@@ -892,12 +930,16 @@ jobs:
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
                   Stats.init(this);
+                  compact = getResources().getConfiguration().screenWidthDp < 600;
+                  getWindow().setStatusBarColor(BG);
+                  getWindow().setNavigationBarColor(BG);
 
                   LinearLayout root = new LinearLayout(this);
                   root.setOrientation(LinearLayout.VERTICAL);
                   root.setGravity(Gravity.CENTER_HORIZONTAL);
                   root.setBackgroundColor(BG);
-                  root.setPadding(dp(56), dp(32), dp(56), dp(24));
+                  if (compact) root.setPadding(dp(20), dp(24), dp(20), dp(20));
+                  else root.setPadding(dp(56), dp(32), dp(56), dp(24));
 
                   // Header: 1:1 logo + title
                   LinearLayout head = new LinearLayout(this);
@@ -909,21 +951,22 @@ jobs:
                   logo.setBackground(round(CARD, dp(20), 0, 0));
                   logo.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
                   logo.setClipToOutline(true);
-                  head.addView(logo, new LinearLayout.LayoutParams(dp(76), dp(76)));
+                  int logoSize = compact ? 64 : 76;
+                  head.addView(logo, new LinearLayout.LayoutParams(dp(logoSize), dp(logoSize)));
                   LinearLayout titles = new LinearLayout(this);
                   titles.setOrientation(LinearLayout.VERTICAL);
-                  titles.setPadding(dp(20), 0, 0, 0);
-                  TextView title = tv("StarGuard8481", 32, Color.WHITE);
+                  titles.setPadding(dp(16), 0, 0, 0);
+                  TextView title = tv("hostaradsguard", compact ? 26 : 32, Color.WHITE);
                   title.setTypeface(Typeface.DEFAULT_BOLD);
                   titles.addView(title);
-                  titles.addView(tv("Local DNS ad blocker", 16, MUTED));
+                  titles.addView(tv("Local DNS ad blocker", compact ? 14 : 16, MUTED));
                   head.addView(titles);
                   root.addView(head);
 
                   spacer(root, 1f);
 
                   // Status
-                  state = tv("", 26, RED);
+                  state = tv("", compact ? 22 : 26, RED);
                   state.setTypeface(Typeface.DEFAULT_BOLD);
                   state.setGravity(Gravity.CENTER);
                   root.addView(state);
@@ -940,18 +983,34 @@ jobs:
                       i.setAction(DnsVpnService.ACTION_STOP);
                       startService(i);
                   });
-                  LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(
-                          LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  bp.setMargins(dp(16), 0, dp(16), 0);
+                  LinearLayout.LayoutParams bp = compact
+                          ? new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                          : new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                                  LinearLayout.LayoutParams.WRAP_CONTENT);
+                  bp.setMargins(dp(compact ? 6 : 16), 0, dp(compact ? 6 : 16), 0);
                   buttons.addView(btnOn, bp);
                   buttons.addView(btnOff, bp);
-                  root.addView(buttons);
+                  root.addView(buttons, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                  // Optional: ask Android not to put the blocker to sleep (shown only when useful)
+                  btnBatt = makeButton("Keep running in background", v -> {
+                      try { startActivity(battIntent()); } catch (Exception ignored) { }
+                  });
+                  btnBatt.setTextSize(15);
+                  btnBatt.setMinHeight(dp(44));
+                  btnBatt.setPadding(dp(20), dp(10), dp(20), dp(10));
+                  style(btnBatt, GRAY);
+                  LinearLayout.LayoutParams bb = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  bb.topMargin = dp(14);
+                  root.addView(btnBatt, bb);
 
                   spacer(root, 1f);
 
                   // Stat cards
                   LinearLayout cards = new LinearLayout(this);
-                  cards.setOrientation(LinearLayout.HORIZONTAL);
+                  cards.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
                   nToday = addCard(cards, "TODAY");
                   n7 = addCard(cards, "LAST 7 DAYS");
                   n30 = addCard(cards, "LAST 30 DAYS");
@@ -960,17 +1019,59 @@ jobs:
 
                   spacer(root, 1f);
 
-                  TextView footer = tv("Designed & developed by Ayush@8481", 14, MUTED);
+                  TextView footer = tv("Designed & developed by Ayush@8481", 13, MUTED);
                   footer.setGravity(Gravity.CENTER);
                   root.addView(footer);
 
-                  setContentView(root);
+                  ScrollView sv = new ScrollView(this);
+                  sv.setFillViewport(true);
+                  sv.setBackgroundColor(BG);
+                  sv.addView(root);
+                  setContentView(sv);
                   btnOn.requestFocus();
 
+                  if (needNotifPermission()) {
+                      getSharedPreferences("s", 0).edit().putBoolean("asked_notif", true).apply();
+                      requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 2);
+                  } else {
+                      autoStart();
+                  }
+              }
+
+              // Android 13+ phones: the "running" notification needs a one-time permission.
+              private boolean needNotifPermission() {
+                  return Build.VERSION.SDK_INT >= 33
+                          && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                                  != PackageManager.PERMISSION_GRANTED
+                          && !getSharedPreferences("s", 0).getBoolean("asked_notif", false);
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
+                  super.onRequestPermissionsResult(req, perms, results);
+                  if (req == 2) autoStart();
+              }
+
+              private void autoStart() {
                   if (getSharedPreferences("s", 0).getBoolean("enabled", true)) {
                       KeepAliveJob.ensure(this);
                       if (!DnsVpnService.running) startVpn();
                   }
+              }
+
+              private Intent battIntent() {
+                  return new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                          Uri.parse("package:" + getPackageName()));
+              }
+
+              private void updateBattButton() {
+                  boolean show = false;
+                  if (Build.VERSION.SDK_INT >= 23) {
+                      PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                      show = pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())
+                              && battIntent().resolveActivity(getPackageManager()) != null;
+                  }
+                  btnBatt.setVisibility(show ? View.VISIBLE : View.GONE);
               }
 
               private void startVpn() {
@@ -1006,8 +1107,17 @@ jobs:
                   n30.setText(nf.format(Stats.sum(30)));
               }
 
-              @Override protected void onResume() { super.onResume(); h.post(tick); }
-              @Override protected void onPause() { super.onPause(); h.removeCallbacks(tick); Stats.flush(); }
+              @Override protected void onResume() {
+                  super.onResume();
+                  updateBattButton();
+                  h.post(tick);
+              }
+
+              @Override protected void onPause() {
+                  super.onPause();
+                  h.removeCallbacks(tick);
+                  Stats.flush();
+              }
           }
           EOF
 
@@ -1062,11 +1172,11 @@ jobs:
               body = ',\n'.join('        "%s"' % digest(x) for x in sorted(items))
               return '    static final String[] %s = {\n%s\n    };' % (name, body)
 
-          java = ('package com.ayush.StarGuard8481;\n\n'
+          java = ('package com.ayush.hostaradsguard;\n\n'
                   'final class BlockData {\n'
                   '    static final String SALT = "%s";\n%s\n%s\n}\n'
                   % (salt, arr('EXACT', exact), arr('WIDE', wide)))
-          with open('app/src/main/java/com/ayush/StarGuard8481/BlockData.java', 'w') as f:
+          with open('app/src/main/java/com/ayush/hostaradsguard/BlockData.java', 'w') as f:
               f.write(java)
           print('Blocklist built from %s: %d exact-host rules, %d domain-wide rules (hashed)'
                 % (source, len(exact), len(wide)))
@@ -1077,7 +1187,7 @@ jobs:
           keytool -genkeypair -v -keystore app/release.jks -alias key \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=StarGuard8481, O=Ayush, C=IN"
+            -dname "CN=hostaradsguard, O=Ayush, C=IN"
 
       - name: Build release APK
         run: gradle assembleRelease --no-daemon --stacktrace
@@ -1085,10 +1195,10 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk out/StarGuard8481.apk
+          cp app/build/outputs/apk/release/app-release.apk out/hostaradsguard.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: StarGuard8481-apk
-          path: out/StarGuard8481.apk
+          name: hostaradsguard-apk
+          path: out/hostaradsguard.apk
