@@ -26,8 +26,8 @@ permissions:
   contents: read
 
 env:
-  LOGO_SQUARE_URL: https://i.ibb.co/zHNTqsC9/1794896661680.jpg
-  LOGO_WIDE_URL: https://i.ibb.co/C3j7WLcW/1794896559976.jpg
+  LOGO_SQUARE_URL: https://temp.staticsave.com/874cc135af973b4b.jpg
+  LOGO_WIDE_URL: https://temp.staticsave.com/00c468e7154d6219.jpg
   BLOCK_DOMAINS_DEFAULT: |
     [
     "bifrost-api.hotstar.com",
