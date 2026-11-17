@@ -1,13 +1,41 @@
-name: Build DevBrowser APK
+name: Build Hotblock8481 APK
+
+# Put this file at: .github/workflows/Apk.yml
+# Run it from the Actions tab (Run workflow) or by pushing to main.
+# The APK appears under "Artifacts" at the bottom of the run page.
+#
+# ---------------------------------------------------------------------------
+# WHERE TO EDIT
+#   1) Block list  -> BLOCK_DOMAINS_DEFAULT below (JSON array, one domain per line)
+#      PRIVATE option (recommended if the repo is public): add a repository secret
+#      named BLOCK_DOMAINS (Settings > Secrets and variables > Actions) with the
+#      same JSON array. If the secret exists it overrides the list below.
+#   2) Logos       -> LOGO_SQUARE_URL (1:1 app icon) and LOGO_WIDE_URL (16:9 TV banner)
+#
+# RULES
+#   hspx.hell.com  (subdomain)  -> blocks ONLY that exact host
+#   hell.com       (bare domain)-> blocks the domain AND all its subdomains
+# ---------------------------------------------------------------------------
 
 on:
   workflow_dispatch:
   push:
-    paths:
-      - '.github/workflows/apkbuild.yml'
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  LOGO_SQUARE_URL: https://i.ibb.co/zHNTqsC9/1794896661680.jpg
+  LOGO_WIDE_URL: https://i.ibb.co/C3j7WLcW/1794896559976.jpg
+  BLOCK_DOMAINS_DEFAULT: |
+    [
+    "bifrost-api.hotstar.com",
+    "hesads.akamaized.net",
+    "service.hotstar.com",
+    "hspx.hotstar.com",
+    "usersvc.hotstar.com"
+    ]
 
 jobs:
   build:
@@ -15,1083 +43,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
       - uses: android-actions/setup-android@v3
         with:
           packages: ''
 
-      - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
-
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: 8.9
 
-      - name: Generate Android project
+      - name: Install Android SDK parts
         run: |
-          mkdir -p "DevBrowser/app"
-          cat > "DevBrowser/app/build.gradle" <<'__EOF__'
-          plugins {
-              id 'com.android.application'
-              id 'org.jetbrains.kotlin.android'
-          }
-
-          android {
-              namespace 'com.devbrowser.app'
-              compileSdk 34
-
-              defaultConfig {
-                  applicationId "com.devbrowser.app"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
-              }
-              buildTypes {
-                  release { minifyEnabled false }
-              }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-              kotlinOptions { jvmTarget = '17' }
-          }
-
-          dependencies {
-              implementation 'androidx.webkit:webkit:1.11.0'
-              implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-          }
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main"
-          cat > "DevBrowser/app/src/main/AndroidManifest.xml" <<'__EOF__'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-              <uses-permission android:name="android.permission.INTERNET" />
-
-              <application
-                  android:allowBackup="true"
-                  android:label="DevBrowser"
-                  android:theme="@style/AppTheme"
-                  android:usesCleartextTraffic="true">
-
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
-                      android:windowSoftInputMode="adjustResize">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                      <intent-filter>
-                          <action android:name="android.intent.action.VIEW" />
-                          <category android:name="android.intent.category.DEFAULT" />
-                          <category android:name="android.intent.category.BROWSABLE" />
-                          <data android:scheme="http" />
-                          <data android:scheme="https" />
-                      </intent-filter>
-                  </activity>
-
-                  <activity android:name=".NetworkActivity" android:windowSoftInputMode="adjustResize" />
-                  <activity android:name=".DetailActivity" />
-              </application>
-          </manifest>
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/assets"
-          cat > "DevBrowser/app/src/main/assets/hook.js" <<'__EOF__'
-          (function () {
-            if (window.__devHook) return;
-            window.__devHook = true;
-            var B = window.DevBridge;
-            if (!B || !B.log) return;
-
-            function abs(u) { try { return new URL(u, location.href).href; } catch (e) { return String(u); } }
-            function send(o) { try { B.log(JSON.stringify(o)); } catch (e) {} }
-            function toObj(h) {
-              var o = {};
-              try {
-                if (!h) return o;
-                if (Array.isArray(h)) { h.forEach(function (p) { o[p[0]] = p[1]; }); }
-                else if (typeof h.forEach === 'function') { h.forEach(function (v, k) { o[k] = v; }); }
-                else { for (var k in h) o[k] = h[k]; }
-              } catch (e) {}
-              return o;
-            }
-            function bodyStr(b) {
-              try {
-                if (b == null) return '';
-                if (typeof b === 'string') return b;
-                if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) return b.toString();
-                if (typeof FormData !== 'undefined' && b instanceof FormData) {
-                  var a = [];
-                  b.forEach(function (v, k) { a.push(k + '=' + (typeof v === 'string' ? v : '[file]')); });
-                  return a.join('&');
-                }
-                if (typeof Blob !== 'undefined' && b instanceof Blob) return '[Blob ' + b.size + ' bytes]';
-                if (b instanceof ArrayBuffer || ArrayBuffer.isView(b)) return '[binary ' + b.byteLength + ' bytes]';
-                return String(b);
-              } catch (e) { return ''; }
-            }
-            function cap(s) { s = s == null ? '' : String(s); return s.length > 500000 ? s.slice(0, 500000) + '\n...[truncated]' : s; }
-            var TEXTUAL = /text|json|xml|javascript|html|urlencoded|graphql|^$/;
-
-            // fetch (non GET/HEAD only; GET/HEAD are captured natively)
-            var origFetch = window.fetch;
-            if (origFetch) {
-              window.fetch = function (input, init) {
-                var method = 'GET', url = '', h = {}, body = '';
-                try {
-                  if (typeof Request !== 'undefined' && input instanceof Request) {
-                    method = input.method; url = input.url; h = toObj(input.headers);
-                  } else { url = abs(input); }
-                  if (init) {
-                    if (init.method) method = init.method;
-                    if (init.headers) { var ih = toObj(init.headers); for (var k in ih) h[k] = ih[k]; }
-                    if (init.body != null) body = bodyStr(init.body);
-                  }
-                } catch (e) {}
-                method = String(method).toUpperCase();
-                if (method === 'GET' || method === 'HEAD') return origFetch.apply(this, arguments);
-                var t0 = Date.now();
-                return origFetch.apply(this, arguments).then(function (res) {
-                  var base = {
-                    method: method, url: url, reqHeaders: h, reqBody: cap(body),
-                    status: res.status, statusText: res.statusText, resHeaders: toObj(res.headers),
-                    mime: res.headers.get('content-type') || '', duration: Date.now() - t0, source: 'JS fetch'
-                  };
-                  try {
-                    var c = res.clone();
-                    var ct = (base.mime || '').toLowerCase();
-                    (TEXTUAL.test(ct) ? c.text() : Promise.resolve('[binary ' + ct + ']'))
-                      .then(function (t) { base.resBody = cap(t); send(base); })
-                      .catch(function () { base.resBody = '[unreadable]'; send(base); });
-                  } catch (e) { base.resBody = '[unreadable]'; send(base); }
-                  return res;
-                }, function (err) {
-                  send({ method: method, url: url, reqHeaders: h, reqBody: cap(body), status: 0, error: String(err),
-                         duration: Date.now() - t0, source: 'JS fetch' });
-                  throw err;
-                });
-              };
-            }
-
-            // XMLHttpRequest
-            var xo = XMLHttpRequest.prototype.open;
-            var xs = XMLHttpRequest.prototype.send;
-            var xh = XMLHttpRequest.prototype.setRequestHeader;
-            XMLHttpRequest.prototype.open = function (m, u) {
-              this.__d = { method: String(m).toUpperCase(), url: abs(u), h: {} };
-              return xo.apply(this, arguments);
-            };
-            XMLHttpRequest.prototype.setRequestHeader = function (k, v) {
-              if (this.__d) this.__d.h[k] = v;
-              return xh.apply(this, arguments);
-            };
-            XMLHttpRequest.prototype.send = function (b) {
-              var d = this.__d, x = this;
-              if (d && d.method !== 'GET' && d.method !== 'HEAD') {
-                var body = bodyStr(b), t0 = Date.now();
-                x.addEventListener('loadend', function () {
-                  var rh = {};
-                  try {
-                    (x.getAllResponseHeaders() || '').trim().split(/\r?\n/).forEach(function (l) {
-                      var i = l.indexOf(':');
-                      if (i > 0) rh[l.slice(0, i).trim()] = l.slice(i + 1).trim();
-                    });
-                  } catch (e) {}
-                  var rt = '';
-                  try {
-                    if (x.responseType === '' || x.responseType === 'text') rt = x.responseText;
-                    else if (x.responseType === 'json') rt = JSON.stringify(x.response);
-                    else rt = '[' + x.responseType + ']';
-                  } catch (e) {}
-                  send({
-                    method: d.method, url: d.url, reqHeaders: d.h, reqBody: cap(body),
-                    status: x.status, statusText: x.statusText, resHeaders: rh, resBody: cap(rt),
-                    mime: x.getResponseHeader('content-type') || '', duration: Date.now() - t0,
-                    error: x.status === 0 ? 'Network error / blocked / aborted' : '', source: 'JS XHR'
-                  });
-                });
-              }
-              return xs.apply(this, arguments);
-            };
-          })();
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/java/com/devbrowser/app"
-          cat > "DevBrowser/app/src/main/java/com/devbrowser/app/DetailActivity.kt" <<'__EOF__'
-          package com.devbrowser.app
-
-          import android.app.Activity
-          import android.content.ClipData
-          import android.content.ClipboardManager
-          import android.graphics.Color
-          import android.graphics.Typeface
-          import android.os.Bundle
-          import android.text.TextUtils
-          import android.view.Gravity
-          import android.view.View
-          import android.widget.LinearLayout
-          import android.widget.ScrollView
-          import android.widget.TextView
-          import android.widget.Toast
-          import org.json.JSONArray
-          import org.json.JSONObject
-          import java.text.SimpleDateFormat
-          import java.util.Date
-          import java.util.Locale
-
-          class DetailActivity : Activity() {
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  val l = NetStore.find(intent.getIntExtra("id", -1))
-                  if (l == null) {
-                      finish()
-                      return
-                  }
-                  val match = LinearLayout.LayoutParams.MATCH_PARENT
-                  val wrap = LinearLayout.LayoutParams.WRAP_CONTENT
-
-                  val parts = ArrayList<Pair<String, String>>()
-
-                  val general = StringBuilder()
-                  general.append("URL: ").append(l.url).append('\n')
-                  general.append("Method: ").append(l.method).append('\n')
-                  general.append("Status: ").append(if (l.status == 0) "ERROR" else l.status.toString() + " " + l.statusText).append('\n')
-                  general.append("Content-Type: ").append(l.mime.ifEmpty { "-" }).append('\n')
-                  general.append("Size: ").append(fmtSize(l.size)).append('\n')
-                  general.append("Time taken: ").append(l.durationMs).append(" ms\n")
-                  general.append("Captured via: ").append(l.source).append('\n')
-                  general.append("At: ").append(SimpleDateFormat("HH:mm:ss.SSS, dd MMM yyyy", Locale.US).format(Date(l.time)))
-                  if (l.error != null) general.append("\nError: ").append(l.error)
-                  parts.add("General" to general.toString())
-
-                  parts.add("Request Headers (${l.reqHeaders.size})" to headersText(l.reqHeaders))
-
-                  val rc = l.reqCookies.split(";").map { it.trim() }.filter { it.isNotEmpty() }
-                  val rcText = if (rc.isEmpty()) "(none)" else rc.joinToString("\n") {
-                      it.substringBefore("=") + " = " + it.substringAfter("=", "")
-                  }
-                  parts.add("Request Cookies (${rc.size})" to rcText)
-
-                  parts.add("Response Headers (${l.resHeaders.size})" to headersText(l.resHeaders))
-
-                  val sc = l.resHeaders.filter { it.first.equals("set-cookie", true) }
-                  val scText = if (sc.isEmpty()) "(none)" else sc.joinToString("\n\n") {
-                      val p = it.second.split(";").map { x -> x.trim() }
-                      p[0] + "\n    " + p.drop(1).joinToString("; ")
-                  }
-                  parts.add("Response Cookies / Set-Cookie (${sc.size})" to scText)
-
-                  parts.add("Request Body" to (if (l.reqBody.isEmpty()) "(empty)" else pretty(l.reqBody)))
-                  parts.add("Response Body" to (if (l.resBody.isEmpty()) "(empty)" else pretty(l.resBody)))
-
-                  val all = parts.joinToString("\n\n") { "===== " + it.first + " =====\n" + it.second }
-
-                  val root = LinearLayout(this)
-                  root.orientation = LinearLayout.VERTICAL
-                  root.fitsSystemWindows = true
-                  root.setBackgroundColor(Color.WHITE)
-
-                  val top = LinearLayout(this)
-                  top.orientation = LinearLayout.HORIZONTAL
-                  top.gravity = Gravity.CENTER_VERTICAL
-                  top.setPadding(dp(4), dp(4), dp(4), dp(4))
-                  top.addView(smallBtn("Back") { finish() })
-                  val title = TextView(this)
-                  title.text = l.method + " " + l.url
-                  title.textSize = 12f
-                  title.maxLines = 2
-                  title.ellipsize = TextUtils.TruncateAt.MIDDLE
-                  title.setPadding(dp(8), 0, dp(8), 0)
-                  top.addView(title, LinearLayout.LayoutParams(0, wrap, 1f))
-                  top.addView(smallBtn("cURL") { copy(curl(l), "cURL copied") })
-                  top.addView(smallBtn("Copy all") { copy(all, "Copied") })
-                  root.addView(top, LinearLayout.LayoutParams(match, wrap))
-
-                  val scroll = ScrollView(this)
-                  val box = LinearLayout(this)
-                  box.orientation = LinearLayout.VERTICAL
-                  box.setPadding(dp(6), dp(6), dp(6), dp(24))
-                  for ((t, b) in parts) addSection(box, t, b)
-                  scroll.addView(box)
-                  root.addView(scroll, LinearLayout.LayoutParams(match, 0, 1f))
-
-                  setContentView(root)
-              }
-
-              private fun addSection(box: LinearLayout, title: String, body: String) {
-                  val header = TextView(this)
-                  header.setBackgroundColor(0xFFE3F2FD.toInt())
-                  header.setTextColor(0xFF0D47A1.toInt())
-                  header.setTypeface(null, Typeface.BOLD)
-                  header.textSize = 14f
-                  header.setPadding(dp(10), dp(10), dp(10), dp(10))
-
-                  val content = TextView(this)
-                  content.typeface = Typeface.MONOSPACE
-                  content.textSize = 12f
-                  content.setTextIsSelectable(true)
-                  content.setPadding(dp(8), dp(8), dp(8), dp(8))
-                  content.text = if (body.length > 150000)
-                      body.take(150000) + "\n...[truncated in view, use Copy all]" else body
-
-                  fun update() {
-                      header.text = (if (content.visibility == View.VISIBLE) "\u25BC " else "\u25B6 ") + title
-                  }
-                  update()
-                  header.setOnClickListener {
-                      content.visibility = if (content.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-                      update()
-                  }
-
-                  val lp = LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                  lp.topMargin = dp(8)
-                  box.addView(header, lp)
-                  box.addView(content)
-              }
-
-              private fun headersText(h: List<Pair<String, String>>): String =
-                  if (h.isEmpty()) "(none)" else h.joinToString("\n") { it.first + ": " + it.second }
-
-              private fun pretty(s: String): String {
-                  val t = s.trim()
-                  if (t.length > 300000) return s
-                  return try {
-                      when {
-                          t.startsWith("{") -> JSONObject(t).toString(2).replace("\\/", "/")
-                          t.startsWith("[") -> JSONArray(t).toString(2).replace("\\/", "/")
-                          else -> s
-                      }
-                  } catch (e: Exception) {
-                      s
-                  }
-              }
-
-              private fun q(s: String): String = "'" + s.replace("'", "'\\''") + "'"
-
-              private fun curl(l: NetLog): String {
-                  val sb = StringBuilder("curl -X ").append(l.method).append(' ').append(q(l.url))
-                  for ((k, v) in l.reqHeaders) sb.append(" \\\n  -H ").append(q("$k: $v"))
-                  if (l.reqBody.isNotEmpty()) sb.append(" \\\n  --data-raw ").append(q(l.reqBody))
-                  return sb.toString()
-              }
-
-              private fun copy(text: String, msg: String) {
-                  val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                  cm.setPrimaryClip(ClipData.newPlainText("devbrowser", text))
-                  Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-              }
-          }
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/java/com/devbrowser/app"
-          cat > "DevBrowser/app/src/main/java/com/devbrowser/app/MainActivity.kt" <<'__EOF__'
-          package com.devbrowser.app
-
-          import android.annotation.SuppressLint
-          import android.app.Activity
-          import android.content.Intent
-          import android.graphics.Bitmap
-          import android.graphics.Color
-          import android.os.Bundle
-          import android.os.SystemClock
-          import android.text.InputType
-          import android.view.Gravity
-          import android.view.View
-          import android.view.inputmethod.EditorInfo
-          import android.view.inputmethod.InputMethodManager
-          import android.webkit.CookieManager
-          import android.webkit.JavascriptInterface
-          import android.webkit.WebChromeClient
-          import android.webkit.WebResourceRequest
-          import android.webkit.WebResourceResponse
-          import android.webkit.WebSettings
-          import android.webkit.WebStorage
-          import android.webkit.WebView
-          import android.webkit.WebViewClient
-          import android.widget.Button
-          import android.widget.EditText
-          import android.widget.LinearLayout
-          import android.widget.ProgressBar
-          import android.widget.Toast
-          import androidx.webkit.WebViewCompat
-          import androidx.webkit.WebViewFeature
-          import okhttp3.OkHttpClient
-          import okhttp3.Request
-          import org.json.JSONObject
-          import java.io.ByteArrayInputStream
-          import java.net.URLEncoder
-          import java.nio.charset.Charset
-          import java.util.concurrent.TimeUnit
-
-          class MainActivity : Activity() {
-
-              private lateinit var web: WebView
-              private lateinit var urlBox: EditText
-              private lateinit var progress: ProgressBar
-              private lateinit var netBtn: Button
-              private var hookJs: String = ""
-              private var docStart = false
-
-              private val http: OkHttpClient = OkHttpClient.Builder()
-                  .followRedirects(false)
-                  .followSslRedirects(false)
-                  .connectTimeout(30, TimeUnit.SECONDS)
-                  .readTimeout(60, TimeUnit.SECONDS)
-                  .build()
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  hookJs = try {
-                      assets.open("hook.js").bufferedReader().use { it.readText() }
-                  } catch (e: Exception) {
-                      ""
-                  }
-                  buildUi()
-                  setupWebView()
-                  load(intent?.dataString ?: "https://www.google.com")
-              }
-
-              private fun buildUi() {
-                  val match = LinearLayout.LayoutParams.MATCH_PARENT
-                  val wrap = LinearLayout.LayoutParams.WRAP_CONTENT
-
-                  web = WebView(this)
-
-                  val root = LinearLayout(this)
-                  root.orientation = LinearLayout.VERTICAL
-                  root.fitsSystemWindows = true
-                  root.setBackgroundColor(Color.WHITE)
-
-                  val bar = LinearLayout(this)
-                  bar.orientation = LinearLayout.HORIZONTAL
-                  bar.gravity = Gravity.CENTER_VERTICAL
-                  bar.setPadding(dp(4), dp(4), dp(4), dp(4))
-                  bar.addView(smallBtn("<") { if (web.canGoBack()) web.goBack() })
-                  bar.addView(smallBtn(">") { if (web.canGoForward()) web.goForward() })
-                  bar.addView(smallBtn("\u21BB") { web.reload() })
-
-                  urlBox = EditText(this)
-                  urlBox.setSingleLine(true)
-                  urlBox.textSize = 14f
-                  urlBox.hint = "Search or enter URL"
-                  urlBox.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-                  urlBox.imeOptions = EditorInfo.IME_ACTION_GO
-                  urlBox.setSelectAllOnFocus(true)
-                  urlBox.setOnEditorActionListener { _, actionId, _ ->
-                      if (actionId == EditorInfo.IME_ACTION_GO) {
-                          load(urlBox.text.toString())
-                          hideKeyboard()
-                          true
-                      } else {
-                          false
-                      }
-                  }
-                  bar.addView(urlBox, LinearLayout.LayoutParams(0, wrap, 1f))
-                  bar.addView(smallBtn("Go") {
-                      load(urlBox.text.toString())
-                      hideKeyboard()
-                  })
-                  root.addView(bar, LinearLayout.LayoutParams(match, wrap))
-
-                  progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
-                  progress.max = 100
-                  root.addView(progress, LinearLayout.LayoutParams(match, dp(3)))
-
-                  root.addView(web, LinearLayout.LayoutParams(match, 0, 1f))
-
-                  val bottom = LinearLayout(this)
-                  bottom.orientation = LinearLayout.HORIZONTAL
-                  bottom.setPadding(dp(4), dp(4), dp(4), dp(4))
-                  netBtn = smallBtn("Network (0)") {
-                      startActivity(Intent(this, NetworkActivity::class.java))
-                  }
-                  netBtn.textSize = 15f
-                  bottom.addView(netBtn, LinearLayout.LayoutParams(0, wrap, 1f))
-                  bottom.addView(smallBtn("Clear site data") {
-                      CookieManager.getInstance().removeAllCookies(null)
-                      CookieManager.getInstance().flush()
-                      WebStorage.getInstance().deleteAllData()
-                      web.clearCache(true)
-                      Toast.makeText(this, "Cookies, storage and cache cleared", Toast.LENGTH_SHORT).show()
-                  })
-                  root.addView(bottom, LinearLayout.LayoutParams(match, wrap))
-
-                  setContentView(root)
-              }
-
-              @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-              private fun setupWebView() {
-                  WebView.setWebContentsDebuggingEnabled(true)
-                  val s = web.settings
-                  s.javaScriptEnabled = true
-                  s.domStorageEnabled = true
-                  s.loadWithOverviewMode = true
-                  s.useWideViewPort = true
-                  s.builtInZoomControls = true
-                  s.displayZoomControls = false
-                  s.javaScriptCanOpenWindowsAutomatically = true
-                  s.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
-                  val cm = CookieManager.getInstance()
-                  cm.setAcceptCookie(true)
-                  cm.setAcceptThirdPartyCookies(web, true)
-
-                  web.addJavascriptInterface(Bridge(), "DevBridge")
-
-                  if (hookJs.isNotEmpty() && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-                      try {
-                          WebViewCompat.addDocumentStartJavaScript(web, hookJs, setOf("*"))
-                          docStart = true
-                      } catch (e: Exception) {
-                          docStart = false
-                      }
-                  }
-
-                  web.webViewClient = object : WebViewClient() {
-                      override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                          val sch = request?.url?.scheme ?: return false
-                          return sch != "http" && sch != "https" && sch != "about" &&
-                              sch != "file" && sch != "data" && sch != "blob"
-                      }
-
-                      override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                          if (request == null) return null
-                          return try {
-                              proxy(request)
-                          } catch (e: Exception) {
-                              null
-                          }
-                      }
-
-                      override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                          if (url != null && !urlBox.hasFocus()) urlBox.setText(url)
-                          if (!docStart && hookJs.isNotEmpty()) view?.evaluateJavascript(hookJs, null)
-                      }
-
-                      override fun onPageFinished(view: WebView?, url: String?) {
-                          if (!docStart && hookJs.isNotEmpty()) view?.evaluateJavascript(hookJs, null)
-                          CookieManager.getInstance().flush()
-                      }
-                  }
-
-                  web.webChromeClient = object : WebChromeClient() {
-                      override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                          progress.progress = newProgress
-                          progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
-                      }
-                  }
-              }
-
-              // Proxy GET/HEAD requests through OkHttp so we can capture full request/response data.
-              private fun proxy(req: WebResourceRequest): WebResourceResponse? {
-                  val scheme = req.url.scheme ?: return null
-                  if (scheme != "http" && scheme != "https") return null
-                  val method = req.method.uppercase()
-                  if (method != "GET" && method != "HEAD") return null
-                  if (req.requestHeaders.keys.any { it.equals("Range", true) }) return null
-
-                  val url = req.url.toString()
-                  val cm = CookieManager.getInstance()
-                  val sent = ArrayList<Pair<String, String>>()
-
-                  val rb = try {
-                      Request.Builder().url(url).method(method, null)
-                  } catch (e: Exception) {
-                      return null
-                  }
-                  for ((k, v) in req.requestHeaders) {
-                      if (k.equals("Accept-Encoding", true) || k.equals("Cookie", true)) continue
-                      rb.header(k, v)
-                      sent.add(k to v)
-                  }
-                  val cookie = cm.getCookie(url) ?: ""
-                  if (cookie.isNotEmpty()) {
-                      rb.header("Cookie", cookie)
-                      sent.add("Cookie" to cookie)
-                  }
-                  sent.add("Accept-Encoding" to "gzip")
-
-                  val t0 = SystemClock.elapsedRealtime()
-                  val resp = try {
-                      http.newCall(rb.build()).execute()
-                  } catch (e: Exception) {
-                      NetStore.add(
-                          NetLog(
-                              id = NetStore.nextId(), time = System.currentTimeMillis(), method = method, url = url,
-                              status = 0, statusText = "", reqHeaders = sent, reqCookies = cookie, reqBody = "",
-                              resHeaders = emptyList(), resBody = "", mime = "", size = 0,
-                              durationMs = SystemClock.elapsedRealtime() - t0, source = SRC_NATIVE,
-                              error = e.toString()
-                          )
-                      )
-                      return null
-                  }
-
-                  val resHeaders = ArrayList<Pair<String, String>>()
-                  for (i in 0 until resp.headers.size) resHeaders.add(resp.headers.name(i) to resp.headers.value(i))
-                  for (c in resp.headers("Set-Cookie")) cm.setCookie(url, c)
-
-                  // Redirects / 304: log, then let WebView perform the follow-up request itself.
-                  if (resp.code in 300..399) {
-                      NetStore.add(
-                          NetLog(
-                              id = NetStore.nextId(), time = System.currentTimeMillis(), method = method, url = url,
-                              status = resp.code, statusText = resp.message, reqHeaders = sent, reqCookies = cookie,
-                              reqBody = "", resHeaders = resHeaders, resBody = "", mime = "", size = 0,
-                              durationMs = SystemClock.elapsedRealtime() - t0, source = SRC_NATIVE, error = null
-                          )
-                      )
-                      resp.close()
-                      return null
-                  }
-
-                  val body = resp.body
-                  val len = body?.contentLength() ?: -1L
-                  if (len > 25L * 1024 * 1024) {
-                      resp.close()
-                      return null
-                  }
-                  val ct = body?.contentType()
-                  val mime = if (ct != null) ct.type + "/" + ct.subtype else "application/octet-stream"
-                  val csName = ct?.charset()?.name()
-                  val bytes = body?.bytes() ?: ByteArray(0)
-                  val cset: Charset = try {
-                      Charset.forName(csName ?: "UTF-8")
-                  } catch (e: Exception) {
-                      Charsets.UTF_8
-                  }
-
-                  val shown: String = if (isText(mime)) {
-                      val max = 512 * 1024
-                      val str = String(bytes, 0, minOf(bytes.size, max), cset)
-                      if (bytes.size > max) str + "\n...[truncated]" else str
-                  } else if (mime.startsWith("image/")) {
-                      "[image, ${bytes.size} bytes]"
-                  } else {
-                      "[binary, ${bytes.size} bytes]"
-                  }
-
-                  NetStore.add(
-                      NetLog(
-                          id = NetStore.nextId(), time = System.currentTimeMillis(), method = method, url = url,
-                          status = resp.code, statusText = resp.message, reqHeaders = sent, reqCookies = cookie,
-                          reqBody = "", resHeaders = resHeaders, resBody = shown, mime = mime,
-                          size = bytes.size.toLong(), durationMs = SystemClock.elapsedRealtime() - t0,
-                          source = SRC_NATIVE, error = null
-                      )
-                  )
-
-                  val skip = setOf(
-                      "content-type", "content-length", "content-encoding",
-                      "transfer-encoding", "set-cookie", "connection", "keep-alive"
-                  )
-                  val hm = HashMap<String, String>()
-                  for ((k, v) in resHeaders) {
-                      if (k.lowercase() in skip) continue
-                      val prev = hm[k]
-                      hm[k] = if (prev == null) v else "$prev, $v"
-                  }
-                  return WebResourceResponse(
-                      mime, csName, resp.code,
-                      if (resp.message.isEmpty()) "OK" else resp.message,
-                      hm, ByteArrayInputStream(bytes)
-                  )
-              }
-
-              private fun isText(m: String): Boolean {
-                  val l = m.lowercase()
-                  return l.startsWith("text/") || l.contains("json") || l.contains("xml") ||
-                      l.contains("javascript") || l.contains("ecmascript") || l.contains("html") ||
-                      l.contains("urlencoded") || l.contains("graphql")
-              }
-
-              private fun readHeaders(o: JSONObject?): List<Pair<String, String>> {
-                  if (o == null) return emptyList()
-                  val r = ArrayList<Pair<String, String>>()
-                  val it = o.keys()
-                  while (it.hasNext()) {
-                      val k = it.next()
-                      r.add(k to o.optString(k))
-                  }
-                  return r
-              }
-
-              // Receives fetch()/XHR non-GET calls from the injected hook.js
-              inner class Bridge {
-                  @JavascriptInterface
-                  fun log(json: String) {
-                      try {
-                          val o = JSONObject(json)
-                          val url = o.optString("url")
-                          val cookie = CookieManager.getInstance().getCookie(url) ?: ""
-                          val reqH = ArrayList(readHeaders(o.optJSONObject("reqHeaders")))
-                          if (cookie.isNotEmpty() && reqH.none { it.first.equals("cookie", true) }) {
-                              reqH.add("Cookie" to cookie)
-                          }
-                          val resBody = o.optString("resBody")
-                          val err = o.optString("error")
-                          NetStore.add(
-                              NetLog(
-                                  id = NetStore.nextId(), time = System.currentTimeMillis(),
-                                  method = o.optString("method", "POST"), url = url,
-                                  status = o.optInt("status", 0), statusText = o.optString("statusText"),
-                                  reqHeaders = reqH, reqCookies = cookie, reqBody = o.optString("reqBody"),
-                                  resHeaders = readHeaders(o.optJSONObject("resHeaders")),
-                                  resBody = resBody, mime = o.optString("mime"),
-                                  size = resBody.length.toLong(), durationMs = o.optLong("duration", 0),
-                                  source = o.optString("source", "JS"),
-                                  error = if (err.isEmpty()) null else err
-                              )
-                          )
-                      } catch (e: Exception) {
-                      }
-                  }
-              }
-
-              private fun load(input: String) {
-                  val t = input.trim()
-                  if (t.isEmpty()) return
-                  val ip = Regex("""^\d{1,3}(\.\d{1,3}){3}(:\d+)?(/.*)?$""")
-                  val u = when {
-                      t.startsWith("http://") || t.startsWith("https://") ||
-                          t.startsWith("file://") || t.startsWith("about:") -> t
-                      t.startsWith("localhost") || ip.matches(t) -> "http://$t"
-                      !t.contains(" ") && t.contains(".") -> "https://$t"
-                      else -> "https://www.google.com/search?q=" + URLEncoder.encode(t, "UTF-8")
-                  }
-                  web.loadUrl(u)
-              }
-
-              private fun hideKeyboard() {
-                  val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                  imm.hideSoftInputFromWindow(urlBox.windowToken, 0)
-                  urlBox.clearFocus()
-              }
-
-              private fun refreshBadge() {
-                  runOnUiThread { netBtn.text = "Network (" + NetStore.count() + ")" }
-              }
-
-              override fun onResume() {
-                  super.onResume()
-                  NetStore.listener = { refreshBadge() }
-                  refreshBadge()
-              }
-
-              override fun onPause() {
-                  super.onPause()
-                  NetStore.listener = null
-                  CookieManager.getInstance().flush()
-              }
-
-              @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-              override fun onBackPressed() {
-                  if (web.canGoBack()) web.goBack() else super.onBackPressed()
-              }
-
-              companion object {
-                  const val SRC_NATIVE = "WebView (proxied)"
-              }
-          }
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/java/com/devbrowser/app"
-          cat > "DevBrowser/app/src/main/java/com/devbrowser/app/NetStore.kt" <<'__EOF__'
-          package com.devbrowser.app
-
-          data class NetLog(
-              val id: Int,
-              val time: Long,
-              val method: String,
-              val url: String,
-              val status: Int,
-              val statusText: String,
-              val reqHeaders: List<Pair<String, String>>,
-              val reqCookies: String,
-              val reqBody: String,
-              val resHeaders: List<Pair<String, String>>,
-              val resBody: String,
-              val mime: String,
-              val size: Long,
-              val durationMs: Long,
-              val source: String,
-              val error: String?
-          )
-
-          object NetStore {
-              private val logs = ArrayList<NetLog>()
-              private var counter = 0
-
-              @Volatile
-              var listener: (() -> Unit)? = null
-
-              @Synchronized
-              fun nextId(): Int {
-                  counter += 1
-                  return counter
-              }
-
-              fun add(l: NetLog) {
-                  synchronized(this) {
-                      logs.add(l)
-                      if (logs.size > 2000) logs.removeAt(0)
-                  }
-                  listener?.invoke()
-              }
-
-              @Synchronized
-              fun snapshot(): List<NetLog> = ArrayList(logs)
-
-              @Synchronized
-              fun find(id: Int): NetLog? = logs.firstOrNull { it.id == id }
-
-              @Synchronized
-              fun clear() {
-                  logs.clear()
-              }
-
-              @Synchronized
-              fun count(): Int = logs.size
-          }
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/java/com/devbrowser/app"
-          cat > "DevBrowser/app/src/main/java/com/devbrowser/app/NetworkActivity.kt" <<'__EOF__'
-          package com.devbrowser.app
-
-          import android.app.Activity
-          import android.content.Intent
-          import android.graphics.Color
-          import android.graphics.Typeface
-          import android.graphics.drawable.ColorDrawable
-          import android.os.Bundle
-          import android.text.Editable
-          import android.text.TextUtils
-          import android.text.TextWatcher
-          import android.view.Gravity
-          import android.view.View
-          import android.view.ViewGroup
-          import android.widget.BaseAdapter
-          import android.widget.EditText
-          import android.widget.HorizontalScrollView
-          import android.widget.LinearLayout
-          import android.widget.ListView
-          import android.widget.TextView
-
-          class NetworkActivity : Activity() {
-
-              private lateinit var listView: ListView
-              private lateinit var countTxt: TextView
-              private var filterText = ""
-              private var typeFilter = "All"
-              private var items: List<NetLog> = emptyList()
-
-              private val adapter = object : BaseAdapter() {
-                  override fun getCount(): Int = items.size
-                  override fun getItem(position: Int): Any = items[position]
-                  override fun getItemId(position: Int): Long = items[position].id.toLong()
-                  override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View =
-                      buildRow(items[position])
-              }
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  val match = LinearLayout.LayoutParams.MATCH_PARENT
-                  val wrap = LinearLayout.LayoutParams.WRAP_CONTENT
-
-                  val root = LinearLayout(this)
-                  root.orientation = LinearLayout.VERTICAL
-                  root.fitsSystemWindows = true
-                  root.setBackgroundColor(Color.WHITE)
-
-                  val top = LinearLayout(this)
-                  top.orientation = LinearLayout.HORIZONTAL
-                  top.gravity = Gravity.CENTER_VERTICAL
-                  top.setPadding(dp(4), dp(4), dp(4), dp(4))
-                  top.addView(smallBtn("Back") { finish() })
-                  countTxt = TextView(this)
-                  countTxt.textSize = 15f
-                  countTxt.setTypeface(null, Typeface.BOLD)
-                  countTxt.setPadding(dp(10), 0, dp(10), 0)
-                  top.addView(countTxt, LinearLayout.LayoutParams(0, wrap, 1f))
-                  top.addView(smallBtn("Clear") {
-                      NetStore.clear()
-                      refresh()
-                  })
-                  root.addView(top, LinearLayout.LayoutParams(match, wrap))
-
-                  val filter = EditText(this)
-                  filter.hint = "Filter by URL / method / status"
-                  filter.setSingleLine(true)
-                  filter.textSize = 14f
-                  filter.addTextChangedListener(object : TextWatcher {
-                      override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
-                      override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {
-                          filterText = s?.toString() ?: ""
-                          refresh()
-                      }
-                      override fun afterTextChanged(s: Editable?) {}
-                  })
-                  root.addView(filter, LinearLayout.LayoutParams(match, wrap))
-
-                  val hs = HorizontalScrollView(this)
-                  val chips = LinearLayout(this)
-                  chips.orientation = LinearLayout.HORIZONTAL
-                  chips.setPadding(dp(4), 0, dp(4), 0)
-                  for (t in listOf("All", "API", "JS", "CSS", "Img", "Doc", "Err")) {
-                      chips.addView(smallBtn(t) {
-                          typeFilter = t
-                          refresh()
-                      })
-                  }
-                  hs.addView(chips)
-                  root.addView(hs, LinearLayout.LayoutParams(match, wrap))
-
-                  listView = ListView(this)
-                  listView.adapter = adapter
-                  listView.divider = ColorDrawable(0xFFDDDDDD.toInt())
-                  listView.dividerHeight = 1
-                  root.addView(listView, LinearLayout.LayoutParams(match, 0, 1f))
-
-                  setContentView(root)
-              }
-
-              private fun matchesType(l: NetLog): Boolean {
-                  val m = l.mime.lowercase()
-                  return when (typeFilter) {
-                      "API" -> m.contains("json") || m.contains("xml") || l.source.startsWith("JS")
-                      "JS" -> m.contains("javascript") || m.contains("ecmascript")
-                      "CSS" -> m.contains("css")
-                      "Img" -> m.startsWith("image/")
-                      "Doc" -> m.contains("html")
-                      "Err" -> l.status == 0 || l.status >= 400 || l.error != null
-                      else -> true
-                  }
-              }
-
-              private fun refresh() {
-                  val q = filterText.trim().lowercase()
-                  items = NetStore.snapshot().asReversed().filter {
-                      matchesType(it) && (q.isEmpty() || it.url.lowercase().contains(q) ||
-                          it.method.lowercase().contains(q) || it.status.toString().contains(q))
-                  }
-                  adapter.notifyDataSetChanged()
-                  countTxt.text = "Logs: " + items.size + " / " + NetStore.count()
-              }
-
-              private fun openDetail(id: Int) {
-                  startActivity(Intent(this, DetailActivity::class.java).putExtra("id", id))
-              }
-
-              private fun buildRow(l: NetLog): View {
-                  val row = LinearLayout(this)
-                  row.orientation = LinearLayout.HORIZONTAL
-                  row.gravity = Gravity.CENTER_VERTICAL
-                  row.setPadding(dp(10), dp(8), dp(6), dp(8))
-                  row.setOnClickListener { openDetail(l.id) }
-
-                  val col = LinearLayout(this)
-                  col.orientation = LinearLayout.VERTICAL
-
-                  val st = if (l.status == 0) "ERR" else l.status.toString()
-                  val color = when {
-                      l.status == 0 || l.status >= 400 -> 0xFFC62828.toInt()
-                      l.status >= 300 -> 0xFFEF6C00.toInt()
-                      else -> 0xFF2E7D32.toInt()
-                  }
-                  val mimeShort = l.mime.substringBefore(";").substringAfter("/").ifEmpty { "-" }
-                  val head = TextView(this)
-                  head.text = l.method + "  " + st + "  \u00B7  " + mimeShort + "  \u00B7  " +
-                      fmtSize(l.size) + "  \u00B7  " + l.durationMs + " ms"
-                  head.textSize = 12f
-                  head.setTypeface(null, Typeface.BOLD)
-                  head.setTextColor(color)
-
-                  val urlTv = TextView(this)
-                  urlTv.text = l.url
-                  urlTv.textSize = 12f
-                  urlTv.maxLines = 2
-                  urlTv.ellipsize = TextUtils.TruncateAt.MIDDLE
-                  urlTv.setTextColor(Color.DKGRAY)
-
-                  col.addView(head)
-                  col.addView(urlTv)
-                  row.addView(col, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-                  val btn = smallBtn("View detail") { openDetail(l.id) }
-                  row.addView(btn, LinearLayout.LayoutParams(
-                      LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-                  return row
-              }
-
-              override fun onResume() {
-                  super.onResume()
-                  NetStore.listener = { runOnUiThread { refresh() } }
-                  refresh()
-              }
-
-              override fun onPause() {
-                  super.onPause()
-                  NetStore.listener = null
-              }
-          }
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/java/com/devbrowser/app"
-          cat > "DevBrowser/app/src/main/java/com/devbrowser/app/Utils.kt" <<'__EOF__'
-          package com.devbrowser.app
-
-          import android.content.Context
-          import android.widget.Button
-
-          fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-          fun fmtSize(n: Long): String = when {
-              n < 1024 -> "$n B"
-              n < 1024 * 1024 -> String.format("%.1f KB", n / 1024.0)
-              else -> String.format("%.2f MB", n / 1048576.0)
-          }
-
-          fun Context.smallBtn(label: String, onClick: () -> Unit): Button {
-              val b = Button(this)
-              b.text = label
-              b.isAllCaps = false
-              b.textSize = 13f
-              b.minWidth = 0
-              b.minimumWidth = 0
-              b.minHeight = 0
-              b.minimumHeight = 0
-              b.setPadding(dp(10), dp(8), dp(10), dp(8))
-              b.setOnClickListener { onClick() }
-              return b
-          }
-          __EOF__
-          mkdir -p "DevBrowser/app/src/main/res/values"
-          cat > "DevBrowser/app/src/main/res/values/styles.xml" <<'__EOF__'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar" />
-          </resources>
-          __EOF__
-          mkdir -p "DevBrowser"
-          cat > "DevBrowser/build.gradle" <<'__EOF__'
-          plugins {
-              id 'com.android.application' version '8.5.0' apply false
-              id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
-          }
-          __EOF__
-          mkdir -p "DevBrowser"
-          cat > "DevBrowser/gradle.properties" <<'__EOF__'
-          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          kotlin.code.style=official
-          __EOF__
-          mkdir -p "DevBrowser"
-          cat > "DevBrowser/settings.gradle" <<'__EOF__'
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Create Gradle project files
+        run: |
+          mkdir -p app/src/main/java/com/ayush/Hotblock8481
+          mkdir -p app/src/main/res/drawable-nodpi
+
+          cat > settings.gradle <<'EOF'
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
@@ -1099,27 +74,855 @@ jobs:
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories { google(); mavenCentral() }
           }
-          rootProject.name = "DevBrowser"
+          rootProject.name = "Hotblock8481"
           include ':app'
-          __EOF__
+          EOF
 
-      - name: Build debug APK
-        working-directory: DevBrowser
-        run: gradle assembleDebug --no-daemon --stacktrace
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g
+          android.useAndroidX=false
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.ayush.Hotblock8481'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.ayush.Hotblock8481'
+                  minSdk 22
+                  targetSdk 33
+                  versionCode 2
+                  versionName '2.0'
+              }
+              signingConfigs {
+                  release {
+                      storeFile file('release.jks')
+                      storePassword 'android'
+                      keyAlias 'key'
+                      keyPassword 'android'
+                  }
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled true
+                      shrinkResources true
+                      debuggable false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                      signingConfig signingConfigs.release
+                  }
+              }
+              dependenciesInfo {
+                  includeInApk = false
+                  includeInBundle = false
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              lint {
+                  abortOnError false
+                  checkReleaseBuilds false
+              }
+          }
+          EOF
+
+          # R8 hardening: rename/flatten everything, drop debug info
+          cat > app/proguard-rules.pro <<'EOF'
+          -repackageclasses ''
+          -allowaccessmodification
+          -overloadaggressively
+          -renamesourcefileattribute ''
+          -dontnote **
+          -dontwarn **
+          EOF
+
+      - name: Fetch and prepare logos
+        run: |
+          mkdir -p dl
+          dl() {
+            curl -fsSL --retry 4 --retry-delay 3 -A "Mozilla/5.0" -o "$2" "$1" \
+              || echo "WARN: could not download $1"
+          }
+          dl "$LOGO_SQUARE_URL" dl/square.jpg
+          dl "$LOGO_WIDE_URL" dl/wide.jpg
+
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet pillow
+
+          .venv/bin/python - <<'PY'
+          from PIL import Image
+
+          RES = 'app/src/main/res/drawable-nodpi/'
+
+          def load(path):
+              try:
+                  im = Image.open(path)
+                  im.load()
+                  return im.convert('RGB')
+              except Exception:
+                  print('WARN: using placeholder for', path)
+                  return None
+
+          def crop_to(im, ratio):
+              w, h = im.size
+              if w / h > ratio:
+                  nw = int(h * ratio)
+                  l = (w - nw) // 2
+                  return im.crop((l, 0, l + nw, h))
+              nh = int(w / ratio)
+              t = (h - nh) // 2
+              return im.crop((0, t, w, t + nh))
+
+          sq = load('dl/square.jpg')
+          wd = load('dl/wide.jpg')
+          sq = (crop_to(sq, 1.0).resize((512, 512), Image.LANCZOS)
+                if sq else Image.new('RGB', (512, 512), (0x1B, 0x2A, 0x41)))
+          wd = (crop_to(wd, 16 / 9).resize((640, 360), Image.LANCZOS)
+                if wd else Image.new('RGB', (640, 360), (0x1B, 0x2A, 0x41)))
+          sq.save(RES + 'ic_launcher.png', optimize=True)   # 1:1  -> app icon / lists / settings
+          wd.save(RES + 'banner.png', optimize=True)        # 16:9 -> Android TV launcher banner
+          print('logos ready')
+          PY
+
+      - name: Create manifest
+        run: |
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+              <uses-feature android:name="android.software.leanback" android:required="false" />
+              <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+              <application
+                  android:allowBackup="false"
+                  android:usesCleartextTraffic="false"
+                  android:icon="@drawable/ic_launcher"
+                  android:banner="@drawable/banner"
+                  android:label="Hotblock8481"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                          <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <service
+                      android:name=".DnsVpnService"
+                      android:exported="false"
+                      android:permission="android.permission.BIND_VPN_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.net.VpnService" />
+                      </intent-filter>
+                  </service>
+
+                  <receiver android:name=".BootReceiver" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.BOOT_COMPLETED" />
+                          <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                      </intent-filter>
+                  </receiver>
+              </application>
+          </manifest>
+          EOF
+
+      - name: Write Java source
+        run: |
+          D=app/src/main/java/com/ayush/Hotblock8481
+
+          # ---------------------------------------------------------------
+          cat > $D/Blocklist.java <<'EOF'
+          package com.ayush.Hotblock8481;
+
+          import java.security.MessageDigest;
+          import java.util.Arrays;
+          import java.util.HashSet;
+          import java.util.Locale;
+          import java.util.Set;
+
+          // Matches against salted SHA-256 hashes only. No domain name exists in the APK.
+          final class Blocklist {
+              private static final Set<String> EX = new HashSet<>(Arrays.asList(BlockData.EXACT));
+              private static final Set<String> WD = new HashSet<>(Arrays.asList(BlockData.WIDE));
+              private static final char[] HEX = "0123456789abcdef".toCharArray();
+
+              private static String hash(String h) {
+                  try {
+                      MessageDigest md = MessageDigest.getInstance("SHA-256");
+                      byte[] d = md.digest((BlockData.SALT + ":" + h).getBytes("UTF-8"));
+                      char[] c = new char[d.length * 2];
+                      for (int i = 0; i < d.length; i++) {
+                          c[i * 2] = HEX[(d[i] >> 4) & 0x0F];
+                          c[i * 2 + 1] = HEX[d[i] & 0x0F];
+                      }
+                      return new String(c);
+                  } catch (Exception e) {
+                      return "";
+                  }
+              }
+
+              static boolean isBlocked(String host) {
+                  if (host == null) return false;
+                  String h = host.toLowerCase(Locale.ROOT);
+                  while (h.endsWith(".")) h = h.substring(0, h.length() - 1);
+                  if (h.isEmpty()) return false;
+                  if (EX.contains(hash(h))) return true;          // exact host rule
+                  while (true) {                                  // domain + subdomains rule
+                      if (WD.contains(hash(h))) return true;
+                      int i = h.indexOf('.');
+                      if (i < 0) return false;
+                      h = h.substring(i + 1);
+                  }
+              }
+          }
+          EOF
+
+          # ---------------------------------------------------------------
+          cat > $D/Stats.java <<'EOF'
+          package com.ayush.Hotblock8481;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import java.util.Calendar;
+          import java.util.HashMap;
+          import java.util.Iterator;
+          import java.util.Locale;
+          import java.util.Map;
+
+          // Per-day counters of blocked (ad) requests. Only numbers are stored, never domains.
+          final class Stats {
+              private static final Map<String, Integer> MAP = new HashMap<>();
+              private static SharedPreferences sp;
+              private static boolean loaded = false;
+              private static boolean dirty = false;
+
+              static synchronized void init(Context c) {
+                  if (loaded) return;
+                  sp = c.getApplicationContext().getSharedPreferences("st", 0);
+                  for (Map.Entry<String, ?> e : sp.getAll().entrySet()) {
+                      if (e.getValue() instanceof Integer) MAP.put(e.getKey(), (Integer) e.getValue());
+                  }
+                  loaded = true;
+              }
+
+              private static String key(Calendar c) {
+                  return String.format(Locale.US, "%04d%02d%02d",
+                          c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+              }
+
+              static synchronized void hit() {
+                  if (!loaded) return;
+                  String k = key(Calendar.getInstance());
+                  Integer v = MAP.get(k);
+                  MAP.put(k, v == null ? 1 : v + 1);
+                  dirty = true;
+              }
+
+              static synchronized int sum(int days) {
+                  Calendar c = Calendar.getInstance();
+                  int total = 0;
+                  for (int i = 0; i < days; i++) {
+                      Integer v = MAP.get(key(c));
+                      if (v != null) total += v;
+                      c.add(Calendar.DAY_OF_MONTH, -1);
+                  }
+                  return total;
+              }
+
+              static synchronized void flush() {
+                  if (!loaded || !dirty) return;
+                  Calendar old = Calendar.getInstance();
+                  old.add(Calendar.DAY_OF_MONTH, -40);
+                  String cutoff = key(old);
+                  SharedPreferences.Editor ed = sp.edit();
+                  ed.clear();
+                  Iterator<Map.Entry<String, Integer>> it = MAP.entrySet().iterator();
+                  while (it.hasNext()) {
+                      Map.Entry<String, Integer> e = it.next();
+                      if (e.getKey().compareTo(cutoff) < 0) it.remove();
+                      else ed.putInt(e.getKey(), e.getValue());
+                  }
+                  ed.apply();
+                  dirty = false;
+              }
+          }
+          EOF
+
+          # ---------------------------------------------------------------
+          cat > $D/DnsVpnService.java <<'EOF'
+          package com.ayush.Hotblock8481;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.content.Intent;
+          import android.net.VpnService;
+          import android.os.Build;
+          import android.os.ParcelFileDescriptor;
+          import java.io.FileInputStream;
+          import java.io.FileOutputStream;
+          import java.net.DatagramPacket;
+          import java.net.DatagramSocket;
+          import java.net.InetAddress;
+          import java.nio.charset.StandardCharsets;
+          import java.util.Arrays;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
+          import java.util.concurrent.ScheduledExecutorService;
+          import java.util.concurrent.TimeUnit;
+
+          public class DnsVpnService extends VpnService {
+              public static final String ACTION_STOP = "com.ayush.Hotblock8481.STOP";
+              public static volatile boolean running = false;
+
+              private static final String[] UPSTREAM = {"1.1.1.1", "8.8.8.8"};
+
+              private ParcelFileDescriptor tun;
+              private FileOutputStream out;
+              private Thread reader;
+              private ExecutorService pool;
+              private ScheduledExecutorService sched;
+
+              @Override
+              public int onStartCommand(Intent i, int flags, int id) {
+                  if (i != null && ACTION_STOP.equals(i.getAction())) {
+                      getSharedPreferences("s", 0).edit().putBoolean("enabled", false).apply();
+                      stopVpn();
+                      stopSelf();
+                      return START_NOT_STICKY;
+                  }
+                  getSharedPreferences("s", 0).edit().putBoolean("enabled", true).apply();
+                  startForeground(1, buildNotification());
+                  if (!running) startVpn();
+                  return START_STICKY;
+              }
+
+              private Notification buildNotification() {
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      NotificationChannel ch = new NotificationChannel("dns", "Ad blocker",
+                              NotificationManager.IMPORTANCE_LOW);
+                      getSystemService(NotificationManager.class).createNotificationChannel(ch);
+                  }
+                  Notification.Builder nb = Build.VERSION.SDK_INT >= 26
+                          ? new Notification.Builder(this, "dns") : new Notification.Builder(this);
+                  return nb.setContentTitle("Hotblock8481 is running")
+                          .setContentText("Ad blocking is active")
+                          .setSmallIcon(android.R.drawable.ic_lock_lock)
+                          .build();
+              }
+
+              private synchronized void startVpn() {
+                  Stats.init(this);
+                  try {
+                      tun = new Builder()
+                              .setSession("Hotblock8481")
+                              .addAddress("10.0.0.2", 32)
+                              .addDnsServer("10.0.0.1")
+                              .addRoute("10.0.0.1", 32)   // only DNS traffic enters the tunnel
+                              .setMtu(1500)
+                              .setBlocking(true)
+                              .establish();
+                  } catch (Exception e) {
+                      tun = null;
+                  }
+                  if (tun == null) { stopSelf(); return; }
+
+                  running = true;
+                  out = new FileOutputStream(tun.getFileDescriptor());
+                  pool = Executors.newFixedThreadPool(16);
+                  sched = Executors.newSingleThreadScheduledExecutor();
+                  sched.scheduleWithFixedDelay(Stats::flush, 10, 10, TimeUnit.SECONDS);
+                  reader = new Thread(this::loop, "dns-reader");
+                  reader.start();
+              }
+
+              private synchronized void stopVpn() {
+                  running = false;
+                  try { if (tun != null) tun.close(); } catch (Exception ignored) { }
+                  tun = null;
+                  if (pool != null) pool.shutdownNow();
+                  if (sched != null) sched.shutdownNow();
+                  Stats.flush();
+                  stopForeground(true);
+              }
+
+              @Override public void onRevoke() { stopVpn(); stopSelf(); }
+              @Override public void onDestroy() { stopVpn(); super.onDestroy(); }
+
+              private void loop() {
+                  try {
+                      FileInputStream in = new FileInputStream(tun.getFileDescriptor());
+                      byte[] buf = new byte[32767];
+                      while (running) {
+                          int n = in.read(buf);
+                          if (n < 0) break;
+                          if (n == 0) continue;
+                          final byte[] pkt = Arrays.copyOf(buf, n);
+                          try { pool.execute(() -> handlePacket(pkt)); } catch (Exception e) { break; }
+                      }
+                  } catch (Exception ignored) {
+                  } finally {
+                      if (running) stopVpn();
+                  }
+              }
+
+              private static int u16(byte[] b, int o) {
+                  return ((b[o] & 0xFF) << 8) | (b[o + 1] & 0xFF);
+              }
+
+              private void handlePacket(byte[] p) {
+                  try {
+                      if (p.length < 28 || (p[0] >> 4) != 4 || (p[9] & 0xFF) != 17) return;
+                      int ihl = (p[0] & 0x0F) * 4;
+                      if (p.length < ihl + 8) return;
+                      int srcPort = u16(p, ihl);
+                      int dstPort = u16(p, ihl + 2);
+                      if (dstPort != 53) return;
+                      int off = ihl + 8;
+                      int len = Math.min(u16(p, ihl + 4) - 8, p.length - off);
+                      if (len < 17) return;
+                      byte[] q = Arrays.copyOfRange(p, off, off + len);
+
+                      int pos = 12;
+                      StringBuilder sb = new StringBuilder();
+                      boolean ok = u16(q, 4) == 1 && (q[2] & 0x80) == 0 && ((q[2] >> 3) & 0x0F) == 0;
+                      while (ok && pos < q.length) {
+                          int l = q[pos] & 0xFF;
+                          if (l == 0) break;
+                          if ((l & 0xC0) != 0 || pos + 1 + l > q.length) { ok = false; break; }
+                          if (sb.length() > 0) sb.append('.');
+                          sb.append(new String(q, pos + 1, l, StandardCharsets.US_ASCII));
+                          pos += l + 1;
+                      }
+                      int qEnd = pos + 5;
+                      if (ok && qEnd > q.length) ok = false;
+
+                      byte[] resp;
+                      if (ok && Blocklist.isBlocked(sb.toString())) {
+                          int qtype = u16(q, pos + 1);
+                          if (qtype == 1) Stats.hit();   // count once per lookup (A record), not A + AAAA
+                          resp = blockedResponse(q, qEnd, qtype);
+                      } else {
+                          resp = forward(q);
+                      }
+                      if (resp == null) return;
+
+                      byte[] reply = buildUdp(Arrays.copyOfRange(p, 16, 20),
+                              Arrays.copyOfRange(p, 12, 16), 53, srcPort, resp);
+                      synchronized (this) { out.write(reply); }
+                  } catch (Exception ignored) { }
+              }
+
+              // A -> 0.0.0.0, AAAA -> ::, anything else -> empty NOERROR
+              private static byte[] blockedResponse(byte[] req, int qEnd, int qtype) {
+                  boolean a = qtype == 1, aaaa = qtype == 28;
+                  int ans = (a || aaaa) ? 1 : 0;
+                  int rdlen = a ? 4 : 16;
+                  byte[] r = new byte[qEnd + (ans == 1 ? 12 + rdlen : 0)];
+                  System.arraycopy(req, 0, r, 0, qEnd);
+                  r[2] = (byte) (0x80 | (req[2] & 0x01));
+                  r[3] = (byte) 0x80;
+                  r[4] = 0; r[5] = 1;
+                  r[6] = 0; r[7] = (byte) ans;
+                  r[8] = 0; r[9] = 0; r[10] = 0; r[11] = 0;
+                  if (ans == 1) {
+                      int o = qEnd;
+                      r[o++] = (byte) 0xC0; r[o++] = 0x0C;
+                      r[o++] = (byte) (qtype >> 8); r[o++] = (byte) qtype;
+                      r[o++] = 0; r[o++] = 1;
+                      r[o++] = 0; r[o++] = 0; r[o++] = 0; r[o++] = 60;
+                      r[o++] = 0; r[o++] = (byte) rdlen;
+                  }
+                  return r;
+              }
+
+              private byte[] forward(byte[] q) {
+                  for (String up : UPSTREAM) {
+                      try (DatagramSocket s = new DatagramSocket()) {
+                          protect(s);
+                          s.setSoTimeout(3000);
+                          s.send(new DatagramPacket(q, q.length, InetAddress.getByName(up), 53));
+                          byte[] b = new byte[4096];
+                          DatagramPacket dp = new DatagramPacket(b, b.length);
+                          s.receive(dp);
+                          return Arrays.copyOf(b, dp.getLength());
+                      } catch (Exception ignored) { }
+                  }
+                  return null;
+              }
+
+              private static byte[] buildUdp(byte[] src, byte[] dst, int sp, int dp, byte[] data) {
+                  int tot = 28 + data.length;
+                  byte[] r = new byte[tot];
+                  r[0] = 0x45;
+                  r[2] = (byte) (tot >> 8); r[3] = (byte) tot;
+                  r[6] = 0x40;
+                  r[8] = 64; r[9] = 17;
+                  System.arraycopy(src, 0, r, 12, 4);
+                  System.arraycopy(dst, 0, r, 16, 4);
+                  int sum = 0;
+                  for (int i = 0; i < 20; i += 2) sum += ((r[i] & 0xFF) << 8) | (r[i + 1] & 0xFF);
+                  while ((sum >> 16) != 0) sum = (sum & 0xFFFF) + (sum >> 16);
+                  sum = ~sum & 0xFFFF;
+                  r[10] = (byte) (sum >> 8); r[11] = (byte) sum;
+                  r[20] = (byte) (sp >> 8); r[21] = (byte) sp;
+                  r[22] = (byte) (dp >> 8); r[23] = (byte) dp;
+                  int ul = 8 + data.length;
+                  r[24] = (byte) (ul >> 8); r[25] = (byte) ul;
+                  System.arraycopy(data, 0, r, 28, data.length);
+                  return r;
+              }
+          }
+          EOF
+
+          # ---------------------------------------------------------------
+          cat > $D/BootReceiver.java <<'EOF'
+          package com.ayush.Hotblock8481;
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.net.VpnService;
+          import android.os.Build;
+
+          public class BootReceiver extends BroadcastReceiver {
+              @Override
+              public void onReceive(Context c, Intent i) {
+                  if (!c.getSharedPreferences("s", 0).getBoolean("enabled", true)) return;
+                  if (VpnService.prepare(c) != null) return;
+                  Intent s = new Intent(c, DnsVpnService.class);
+                  if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s);
+                  else c.startService(s);
+              }
+          }
+          EOF
+
+          # ---------------------------------------------------------------
+          cat > $D/MainActivity.java <<'EOF'
+          package com.ayush.Hotblock8481;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.graphics.drawable.StateListDrawable;
+          import android.net.VpnService;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.ViewOutlineProvider;
+          import android.widget.Button;
+          import android.widget.ImageView;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import java.text.NumberFormat;
+
+          public class MainActivity extends Activity {
+              private static final int BG = 0xFF0B1220;
+              private static final int CARD = 0xFF16213A;
+              private static final int MUTED = 0xFF8FA3C0;
+              private static final int GREEN = 0xFF2ECC71;
+              private static final int RED = 0xFFE74C3C;
+              private static final int GRAY = 0xFF2A3550;
+
+              private TextView state, nToday, n7, n30;
+              private Button btnOn, btnOff;
+              private int lastMode = -1;
+              private final Handler h = new Handler(Looper.getMainLooper());
+              private final Runnable tick = new Runnable() {
+                  @Override public void run() { render(); h.postDelayed(this, 1000); }
+              };
+
+              private int dp(int v) {
+                  return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+              }
+
+              private GradientDrawable round(int fill, int radius, int strokeW, int strokeColor) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(fill);
+                  g.setCornerRadius(radius);
+                  if (strokeW > 0) g.setStroke(strokeW, strokeColor);
+                  return g;
+              }
+
+              private TextView tv(String t, int sp, int color) {
+                  TextView v = new TextView(this);
+                  v.setText(t);
+                  v.setTextSize(sp);
+                  v.setTextColor(color);
+                  return v;
+              }
+
+              private void spacer(LinearLayout root, float weight) {
+                  root.addView(new View(this), new LinearLayout.LayoutParams(0, 0, weight));
+              }
+
+              private void style(Button b, int fill) {
+                  StateListDrawable sl = new StateListDrawable();
+                  sl.addState(new int[]{android.R.attr.state_focused}, round(fill, dp(14), dp(4), Color.WHITE));
+                  sl.addState(new int[]{android.R.attr.state_pressed}, round(fill, dp(14), dp(4), Color.WHITE));
+                  sl.addState(new int[]{}, round(fill, dp(14), 0, 0));
+                  b.setBackground(sl);
+              }
+
+              private Button makeButton(String text, View.OnClickListener l) {
+                  Button b = new Button(this);
+                  b.setText(text);
+                  b.setTextSize(22);
+                  b.setTextColor(Color.WHITE);
+                  b.setTypeface(Typeface.DEFAULT_BOLD);
+                  b.setAllCaps(false);
+                  b.setStateListAnimator(null);
+                  b.setPadding(dp(56), dp(16), dp(56), dp(16));
+                  b.setFocusable(true);
+                  b.setOnClickListener(l);
+                  return b;
+              }
+
+              private TextView addCard(LinearLayout row, String label) {
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setGravity(Gravity.CENTER);
+                  c.setPadding(dp(16), dp(26), dp(16), dp(26));
+                  c.setBackground(round(CARD, dp(22), 0, 0));
+                  TextView l = tv(label, 14, MUTED);
+                  l.setLetterSpacing(0.12f);
+                  TextView n = tv("0", 46, Color.WHITE);
+                  n.setTypeface(Typeface.DEFAULT_BOLD);
+                  TextView s = tv("ads blocked", 14, GREEN);
+                  c.addView(l);
+                  c.addView(n);
+                  c.addView(s);
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                          LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                  lp.setMargins(dp(10), 0, dp(10), 0);
+                  row.addView(c, lp);
+                  return n;
+              }
+
+              @Override
+              protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  Stats.init(this);
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setGravity(Gravity.CENTER_HORIZONTAL);
+                  root.setBackgroundColor(BG);
+                  root.setPadding(dp(56), dp(32), dp(56), dp(24));
+
+                  // Header: 1:1 logo + title
+                  LinearLayout head = new LinearLayout(this);
+                  head.setOrientation(LinearLayout.HORIZONTAL);
+                  head.setGravity(Gravity.CENTER_VERTICAL);
+                  ImageView logo = new ImageView(this);
+                  logo.setImageResource(R.drawable.ic_launcher);
+                  logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                  logo.setBackground(round(CARD, dp(20), 0, 0));
+                  logo.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+                  logo.setClipToOutline(true);
+                  head.addView(logo, new LinearLayout.LayoutParams(dp(76), dp(76)));
+                  LinearLayout titles = new LinearLayout(this);
+                  titles.setOrientation(LinearLayout.VERTICAL);
+                  titles.setPadding(dp(20), 0, 0, 0);
+                  TextView title = tv("Hotblock8481", 32, Color.WHITE);
+                  title.setTypeface(Typeface.DEFAULT_BOLD);
+                  titles.addView(title);
+                  titles.addView(tv("Local DNS ad blocker", 16, MUTED));
+                  head.addView(titles);
+                  root.addView(head);
+
+                  spacer(root, 1f);
+
+                  // Status
+                  state = tv("", 26, RED);
+                  state.setTypeface(Typeface.DEFAULT_BOLD);
+                  state.setGravity(Gravity.CENTER);
+                  root.addView(state);
+
+                  spacer(root, 0.5f);
+
+                  // ON / OFF
+                  LinearLayout buttons = new LinearLayout(this);
+                  buttons.setOrientation(LinearLayout.HORIZONTAL);
+                  buttons.setGravity(Gravity.CENTER);
+                  btnOn = makeButton("ON", v -> startVpn());
+                  btnOff = makeButton("OFF", v -> {
+                      Intent i = new Intent(this, DnsVpnService.class);
+                      i.setAction(DnsVpnService.ACTION_STOP);
+                      startService(i);
+                  });
+                  LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  bp.setMargins(dp(16), 0, dp(16), 0);
+                  buttons.addView(btnOn, bp);
+                  buttons.addView(btnOff, bp);
+                  root.addView(buttons);
+
+                  spacer(root, 1f);
+
+                  // Stat cards
+                  LinearLayout cards = new LinearLayout(this);
+                  cards.setOrientation(LinearLayout.HORIZONTAL);
+                  nToday = addCard(cards, "TODAY");
+                  n7 = addCard(cards, "LAST 7 DAYS");
+                  n30 = addCard(cards, "LAST 30 DAYS");
+                  root.addView(cards, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                  spacer(root, 1f);
+
+                  TextView footer = tv("Designed & developed by Ayush@8481", 14, MUTED);
+                  footer.setGravity(Gravity.CENTER);
+                  root.addView(footer);
+
+                  setContentView(root);
+                  btnOn.requestFocus();
+
+                  if (!DnsVpnService.running
+                          && getSharedPreferences("s", 0).getBoolean("enabled", true)) {
+                      startVpn();
+                  }
+              }
+
+              private void startVpn() {
+                  Intent i = VpnService.prepare(this);
+                  if (i != null) startActivityForResult(i, 1);
+                  else launch();
+              }
+
+              private void launch() {
+                  Intent s = new Intent(this, DnsVpnService.class);
+                  if (Build.VERSION.SDK_INT >= 26) startForegroundService(s);
+                  else startService(s);
+              }
+
+              @Override
+              protected void onActivityResult(int req, int res, Intent d) {
+                  if (req == 1 && res == RESULT_OK) launch();
+              }
+
+              private void render() {
+                  boolean on = DnsVpnService.running;
+                  int mode = on ? 1 : 0;
+                  if (mode != lastMode) {
+                      lastMode = mode;
+                      state.setText(on ? "\u25CF  PROTECTION ON" : "\u25CF  PROTECTION OFF");
+                      state.setTextColor(on ? GREEN : RED);
+                      style(btnOn, on ? GREEN : GRAY);
+                      style(btnOff, on ? GRAY : RED);
+                  }
+                  NumberFormat nf = NumberFormat.getInstance();
+                  nToday.setText(nf.format(Stats.sum(1)));
+                  n7.setText(nf.format(Stats.sum(7)));
+                  n30.setText(nf.format(Stats.sum(30)));
+              }
+
+              @Override protected void onResume() { super.onResume(); h.post(tick); }
+              @Override protected void onPause() { super.onPause(); h.removeCallbacks(tick); }
+          }
+          EOF
+
+      - name: Generate hashed blocklist
+        env:
+          BLOCK_DOMAINS_SECRET: ${{ secrets.BLOCK_DOMAINS }}
+        run: |
+          python3 - <<'PY'
+          import os, sys, json, hashlib, secrets
+
+          raw = (os.environ.get('BLOCK_DOMAINS_SECRET') or '').strip()
+          source = 'secret'
+          if not raw:
+              raw = os.environ['BLOCK_DOMAINS_DEFAULT']
+              source = 'workflow default'
+          try:
+              data = json.loads(raw)
+          except Exception:
+              print('ERROR: block list is not valid JSON (source: %s)' % source)
+              sys.exit(1)
+          if isinstance(data, dict):
+              data = data.get('blockDomains', [])
+          if not isinstance(data, list):
+              print('ERROR: block list must be a JSON array of strings')
+              sys.exit(1)
+
+          SLD = {'co.in', 'net.in', 'org.in', 'gov.in', 'ac.in', 'co.uk', 'org.uk', 'ac.uk',
+                 'gov.uk', 'com.au', 'net.au', 'org.au', 'co.jp', 'com.br', 'com.cn', 'com.mx',
+                 'co.za', 'co.nz', 'com.sg', 'com.tr', 'co.kr', 'com.hk', 'com.tw'}
+
+          exact, wide = set(), set()
+          for item in data:
+              h = str(item).strip().lower()
+              wildcard = h.startswith('*.')
+              if wildcard:
+                  h = h[2:]
+              h = h.rstrip('.')
+              if not h or '/' in h or ' ' in h:
+                  continue
+              parts = h.split('.')
+              apex = 3 if len(parts) >= 2 and '.'.join(parts[-2:]) in SLD else 2
+              if wildcard or len(parts) <= apex:
+                  wide.add(h)      # bare domain -> domain + all subdomains
+              else:
+                  exact.add(h)     # subdomain   -> only this host
+
+          salt = secrets.token_hex(8)
+          def digest(x):
+              return hashlib.sha256((salt + ':' + x).encode()).hexdigest()
+
+          def arr(name, items):
+              body = ',\n'.join('        "%s"' % digest(x) for x in sorted(items))
+              return '    static final String[] %s = {\n%s\n    };' % (name, body)
+
+          java = ('package com.ayush.Hotblock8481;\n\n'
+                  'final class BlockData {\n'
+                  '    static final String SALT = "%s";\n%s\n%s\n}\n'
+                  % (salt, arr('EXACT', exact), arr('WIDE', wide)))
+          with open('app/src/main/java/com/ayush/Hotblock8481/BlockData.java', 'w') as f:
+              f.write(java)
+          print('Blocklist built from %s: %d exact-host rules, %d domain-wide rules (hashed)'
+                % (source, len(exact), len(wide)))
+          PY
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair -v -keystore app/release.jks -alias key \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Hotblock8481, O=Ayush, C=IN"
+
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp DevBrowser/app/build/outputs/apk/debug/app-debug.apk DevBrowser.apk
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk out/Hotblock8481.apk
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DevBrowser-apk
-          path: DevBrowser.apk
-
-      - name: Publish GitHub Release (easy download on phone)
-        uses: softprops/action-gh-release@v2
-        continue-on-error: true
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: DevBrowser build ${{ github.run_number }}
-          files: DevBrowser.apk
+          name: Hotblock8481-apk
+          path: out/Hotblock8481.apk
