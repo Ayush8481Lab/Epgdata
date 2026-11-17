@@ -30,11 +30,11 @@ env:
   LOGO_WIDE_URL: https://i.ibb.co/C3j7WLcW/1794896559976.jpg
   BLOCK_DOMAINS_DEFAULT: |
     [
-      "pal.exam.com",
-      "Exm.akamaized.net",
-      "service.new.com",
-      "hspx.hell.com",
-      "usersvc.mes.com"
+    "bifrost-api.hotstar.com",
+    "hesads.akamaized.net",
+    "service.hotstar.com",
+    "hspx.hotstar.com",
+    "usersvc.hotstar.com"
     ]
 
 jobs:
