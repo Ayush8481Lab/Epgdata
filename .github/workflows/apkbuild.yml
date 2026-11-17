@@ -1,4 +1,4 @@
-name: Build Hotblock8481 APK
+name: Build StarGuard8481 APK
 
 # Put this file at: .github/workflows/Apk.yml
 # Run it from the Actions tab (Run workflow) or by pushing to main.
@@ -26,8 +26,8 @@ permissions:
   contents: read
 
 env:
-  LOGO_SQUARE_URL: https://temp.staticsave.com/874cc135af973b4b.jpg
-  LOGO_WIDE_URL: https://temp.staticsave.com/00c468e7154d6219.jpg
+  LOGO_SQUARE_URL: https://i.ibb.co/zHNTqsC9/1794896661680.jpg
+  LOGO_WIDE_URL: https://i.ibb.co/C3j7WLcW/1794896559976.jpg
   BLOCK_DOMAINS_DEFAULT: |
     [
     "bifrost-api.hotstar.com",
@@ -35,7 +35,7 @@ env:
     "service.hotstar.com",
     "hspx.hotstar.com",
     "usersvc.hotstar.com"
-    ]
+  ]
 
 jobs:
   build:
@@ -63,7 +63,7 @@ jobs:
 
       - name: Create Gradle project files
         run: |
-          mkdir -p app/src/main/java/com/ayush/Hotblock8481
+          mkdir -p app/src/main/java/com/ayush/StarGuard8481
           mkdir -p app/src/main/res/drawable-nodpi
 
           cat > settings.gradle <<'EOF'
@@ -74,7 +74,7 @@ jobs:
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories { google(); mavenCentral() }
           }
-          rootProject.name = "Hotblock8481"
+          rootProject.name = "StarGuard8481"
           include ':app'
           EOF
 
@@ -94,14 +94,14 @@ jobs:
               id 'com.android.application'
           }
           android {
-              namespace 'com.ayush.Hotblock8481'
+              namespace 'com.ayush.StarGuard8481'
               compileSdk 34
               defaultConfig {
-                  applicationId 'com.ayush.Hotblock8481'
+                  applicationId 'com.ayush.StarGuard8481'
                   minSdk 22
                   targetSdk 33
-                  versionCode 2
-                  versionName '2.0'
+                  versionCode 3
+                  versionName '2.1'
               }
               signingConfigs {
                   release {
@@ -211,7 +211,7 @@ jobs:
                   android:usesCleartextTraffic="false"
                   android:icon="@drawable/ic_launcher"
                   android:banner="@drawable/banner"
-                  android:label="Hotblock8481"
+                  android:label="StarGuard8481"
                   android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
                   <activity
@@ -233,11 +233,18 @@ jobs:
                       </intent-filter>
                   </service>
 
+                  <service
+                      android:name=".KeepAliveJob"
+                      android:exported="false"
+                      android:permission="android.permission.BIND_JOB_SERVICE" />
+
                   <receiver android:name=".BootReceiver" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.BOOT_COMPLETED" />
                           <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                          <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
                           <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                          <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
                       </intent-filter>
                   </receiver>
               </application>
@@ -246,16 +253,19 @@ jobs:
 
       - name: Write Java source
         run: |
-          D=app/src/main/java/com/ayush/Hotblock8481
+          D=app/src/main/java/com/ayush/StarGuard8481
 
           # ---------------------------------------------------------------
           cat > $D/Blocklist.java <<'EOF'
-          package com.ayush.Hotblock8481;
+          package com.ayush.StarGuard8481;
 
           import java.security.MessageDigest;
           import java.util.Arrays;
+          import java.util.Collections;
           import java.util.HashSet;
+          import java.util.LinkedHashMap;
           import java.util.Locale;
+          import java.util.Map;
           import java.util.Set;
 
           // Matches against salted SHA-256 hashes only. No domain name exists in the APK.
@@ -263,6 +273,15 @@ jobs:
               private static final Set<String> EX = new HashSet<>(Arrays.asList(BlockData.EXACT));
               private static final Set<String> WD = new HashSet<>(Arrays.asList(BlockData.WIDE));
               private static final char[] HEX = "0123456789abcdef".toCharArray();
+
+              // Small in-memory LRU so repeated lookups cost almost nothing (never written to disk).
+              private static final Map<String, Boolean> CACHE = Collections.synchronizedMap(
+                      new LinkedHashMap<String, Boolean>(256, 0.75f, true) {
+                          @Override
+                          protected boolean removeEldestEntry(Map.Entry<String, Boolean> e) {
+                              return size() > 512;
+                          }
+                      });
 
               private static String hash(String h) {
                   try {
@@ -279,11 +298,7 @@ jobs:
                   }
               }
 
-              static boolean isBlocked(String host) {
-                  if (host == null) return false;
-                  String h = host.toLowerCase(Locale.ROOT);
-                  while (h.endsWith(".")) h = h.substring(0, h.length() - 1);
-                  if (h.isEmpty()) return false;
+              private static boolean compute(String h) {
                   if (EX.contains(hash(h))) return true;          // exact host rule
                   while (true) {                                  // domain + subdomains rule
                       if (WD.contains(hash(h))) return true;
@@ -292,15 +307,28 @@ jobs:
                       h = h.substring(i + 1);
                   }
               }
+
+              static boolean isBlocked(String host) {
+                  if (host == null) return false;
+                  String h = host.toLowerCase(Locale.ROOT);
+                  while (h.endsWith(".")) h = h.substring(0, h.length() - 1);
+                  if (h.isEmpty()) return false;
+                  Boolean c = CACHE.get(h);
+                  if (c != null) return c;
+                  boolean r = compute(h);
+                  CACHE.put(h, r);
+                  return r;
+              }
           }
           EOF
 
           # ---------------------------------------------------------------
           cat > $D/Stats.java <<'EOF'
-          package com.ayush.Hotblock8481;
+          package com.ayush.StarGuard8481;
 
           import android.content.Context;
           import android.content.SharedPreferences;
+          import android.os.SystemClock;
           import java.util.Calendar;
           import java.util.HashMap;
           import java.util.Iterator;
@@ -313,6 +341,7 @@ jobs:
               private static SharedPreferences sp;
               private static boolean loaded = false;
               private static boolean dirty = false;
+              private static long lastFlush = 0;
 
               static synchronized void init(Context c) {
                   if (loaded) return;
@@ -334,6 +363,8 @@ jobs:
                   Integer v = MAP.get(k);
                   MAP.put(k, v == null ? 1 : v + 1);
                   dirty = true;
+                  // Save at most every 30 s, driven by traffic itself: no timer thread needed.
+                  if (SystemClock.elapsedRealtime() - lastFlush > 30000) flush();
               }
 
               static synchronized int sum(int days) {
@@ -362,13 +393,14 @@ jobs:
                   }
                   ed.apply();
                   dirty = false;
+                  lastFlush = SystemClock.elapsedRealtime();
               }
           }
           EOF
 
           # ---------------------------------------------------------------
           cat > $D/DnsVpnService.java <<'EOF'
-          package com.ayush.Hotblock8481;
+          package com.ayush.StarGuard8481;
 
           import android.app.Notification;
           import android.app.NotificationChannel;
@@ -377,6 +409,7 @@ jobs:
           import android.net.VpnService;
           import android.os.Build;
           import android.os.ParcelFileDescriptor;
+          import android.os.SystemClock;
           import java.io.FileInputStream;
           import java.io.FileOutputStream;
           import java.net.DatagramPacket;
@@ -384,27 +417,30 @@ jobs:
           import java.net.InetAddress;
           import java.nio.charset.StandardCharsets;
           import java.util.Arrays;
-          import java.util.concurrent.ExecutorService;
-          import java.util.concurrent.Executors;
-          import java.util.concurrent.ScheduledExecutorService;
+          import java.util.concurrent.ConcurrentLinkedQueue;
+          import java.util.concurrent.LinkedBlockingQueue;
+          import java.util.concurrent.ThreadPoolExecutor;
           import java.util.concurrent.TimeUnit;
 
           public class DnsVpnService extends VpnService {
-              public static final String ACTION_STOP = "com.ayush.Hotblock8481.STOP";
+              public static final String ACTION_STOP = "com.ayush.StarGuard8481.STOP";
               public static volatile boolean running = false;
 
               private static final String[] UPSTREAM = {"1.1.1.1", "8.8.8.8"};
+              private static final int UPSTREAM_TIMEOUT_MS = 2000;
+              private static final int MAX_IDLE_SOCKETS = 6;
 
+              private final ConcurrentLinkedQueue<DatagramSocket> socks = new ConcurrentLinkedQueue<>();
               private ParcelFileDescriptor tun;
               private FileOutputStream out;
               private Thread reader;
-              private ExecutorService pool;
-              private ScheduledExecutorService sched;
+              private ThreadPoolExecutor pool;
 
               @Override
               public int onStartCommand(Intent i, int flags, int id) {
                   if (i != null && ACTION_STOP.equals(i.getAction())) {
                       getSharedPreferences("s", 0).edit().putBoolean("enabled", false).apply();
+                      KeepAliveJob.cancel(this);
                       stopVpn();
                       stopSelf();
                       return START_NOT_STICKY;
@@ -412,6 +448,7 @@ jobs:
                   getSharedPreferences("s", 0).edit().putBoolean("enabled", true).apply();
                   startForeground(1, buildNotification());
                   if (!running) startVpn();
+                  KeepAliveJob.ensure(this);   // system-level watchdog that survives reboot
                   return START_STICKY;
               }
 
@@ -423,7 +460,7 @@ jobs:
                   }
                   Notification.Builder nb = Build.VERSION.SDK_INT >= 26
                           ? new Notification.Builder(this, "dns") : new Notification.Builder(this);
-                  return nb.setContentTitle("Hotblock8481 is running")
+                  return nb.setContentTitle("StarGuard8481 is running")
                           .setContentText("Ad blocking is active")
                           .setSmallIcon(android.R.drawable.ic_lock_lock)
                           .build();
@@ -433,7 +470,7 @@ jobs:
                   Stats.init(this);
                   try {
                       tun = new Builder()
-                              .setSession("Hotblock8481")
+                              .setSession("StarGuard8481")
                               .addAddress("10.0.0.2", 32)
                               .addDnsServer("10.0.0.1")
                               .addRoute("10.0.0.1", 32)   // only DNS traffic enters the tunnel
@@ -443,13 +480,19 @@ jobs:
                   } catch (Exception e) {
                       tun = null;
                   }
-                  if (tun == null) { stopSelf(); return; }
+                  if (tun == null) {
+                      KeepAliveJob.kick(this, 30000);   // try again shortly
+                      stopSelf();
+                      return;
+                  }
 
                   running = true;
                   out = new FileOutputStream(tun.getFileDescriptor());
-                  pool = Executors.newFixedThreadPool(16);
-                  sched = Executors.newSingleThreadScheduledExecutor();
-                  sched.scheduleWithFixedDelay(Stats::flush, 10, 10, TimeUnit.SECONDS);
+                  // Small bounded pool; idle threads exit after 20 s so nothing sits around using memory.
+                  pool = new ThreadPoolExecutor(6, 6, 20, TimeUnit.SECONDS,
+                          new LinkedBlockingQueue<Runnable>(512),
+                          new ThreadPoolExecutor.DiscardPolicy());
+                  pool.allowCoreThreadTimeOut(true);
                   reader = new Thread(this::loop, "dns-reader");
                   reader.start();
               }
@@ -459,7 +502,8 @@ jobs:
                   try { if (tun != null) tun.close(); } catch (Exception ignored) { }
                   tun = null;
                   if (pool != null) pool.shutdownNow();
-                  if (sched != null) sched.shutdownNow();
+                  DatagramSocket s;
+                  while ((s = socks.poll()) != null) s.close();
                   Stats.flush();
                   stopForeground(true);
               }
@@ -472,11 +516,11 @@ jobs:
                       FileInputStream in = new FileInputStream(tun.getFileDescriptor());
                       byte[] buf = new byte[32767];
                       while (running) {
-                          int n = in.read(buf);
+                          int n = in.read(buf);   // blocks, zero CPU while idle
                           if (n < 0) break;
                           if (n == 0) continue;
                           final byte[] pkt = Arrays.copyOf(buf, n);
-                          try { pool.execute(() -> handlePacket(pkt)); } catch (Exception e) { break; }
+                          try { pool.execute(() -> handlePacket(pkt)); } catch (Exception ignored) { }
                       }
                   } catch (Exception ignored) {
                   } finally {
@@ -522,6 +566,7 @@ jobs:
                           resp = blockedResponse(q, qEnd, qtype);
                       } else {
                           resp = forward(q);
+                          if (resp == null && ok) resp = servfail(q, qEnd);   // fail fast, no long hangs
                       }
                       if (resp == null) return;
 
@@ -554,17 +599,57 @@ jobs:
                   return r;
               }
 
+              private static byte[] servfail(byte[] q, int qEnd) {
+                  byte[] r = Arrays.copyOf(q, qEnd);
+                  r[2] = (byte) (0x80 | (q[2] & 0x01));
+                  r[3] = (byte) 0x82;   // RA=1, RCODE=2 (SERVFAIL)
+                  r[4] = 0; r[5] = 1;
+                  r[6] = 0; r[7] = 0; r[8] = 0; r[9] = 0; r[10] = 0; r[11] = 0;
+                  return r;
+              }
+
+              private DatagramSocket borrow() throws Exception {
+                  DatagramSocket s = socks.poll();
+                  if (s == null) {
+                      s = new DatagramSocket();
+                      protect(s);   // keep upstream traffic outside the VPN
+                  }
+                  return s;
+              }
+
+              private void giveBack(DatagramSocket s, boolean healthy) {
+                  if (healthy && running && socks.size() < MAX_IDLE_SOCKETS) socks.offer(s);
+                  else s.close();
+              }
+
+              // Reuses sockets (no new socket per query) and ignores late/mismatched replies.
               private byte[] forward(byte[] q) {
                   for (String up : UPSTREAM) {
-                      try (DatagramSocket s = new DatagramSocket()) {
-                          protect(s);
-                          s.setSoTimeout(3000);
-                          s.send(new DatagramPacket(q, q.length, InetAddress.getByName(up), 53));
+                      DatagramSocket s = null;
+                      boolean healthy = false;
+                      try {
+                          s = borrow();
+                          InetAddress addr = InetAddress.getByName(up);
+                          s.send(new DatagramPacket(q, q.length, addr, 53));
                           byte[] b = new byte[4096];
                           DatagramPacket dp = new DatagramPacket(b, b.length);
-                          s.receive(dp);
-                          return Arrays.copyOf(b, dp.getLength());
-                      } catch (Exception ignored) { }
+                          long deadline = SystemClock.elapsedRealtime() + UPSTREAM_TIMEOUT_MS;
+                          while (true) {
+                              long left = deadline - SystemClock.elapsedRealtime();
+                              if (left <= 0) break;
+                              s.setSoTimeout((int) left);
+                              dp.setLength(b.length);
+                              s.receive(dp);
+                              if (dp.getLength() >= 12 && b[0] == q[0] && b[1] == q[1]
+                                      && addr.equals(dp.getAddress())) {
+                                  healthy = true;
+                                  return Arrays.copyOf(b, dp.getLength());
+                              }
+                          }
+                      } catch (Exception ignored) {
+                      } finally {
+                          if (s != null) giveBack(s, healthy);
+                      }
                   }
                   return null;
               }
@@ -594,8 +679,82 @@ jobs:
           EOF
 
           # ---------------------------------------------------------------
+          cat > $D/KeepAliveJob.java <<'EOF'
+          package com.ayush.StarGuard8481;
+
+          import android.app.job.JobInfo;
+          import android.app.job.JobParameters;
+          import android.app.job.JobScheduler;
+          import android.app.job.JobService;
+          import android.content.ComponentName;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.net.VpnService;
+          import android.os.Build;
+
+          // System-scheduled, reboot-persistent watchdog. Independent of the boot broadcast, so the
+          // blocker comes back even if the device never delivers BOOT_COMPLETED to the app.
+          public class KeepAliveJob extends JobService {
+              private static final int ID_PERIODIC = 1001;
+              private static final int ID_ONCE = 1002;
+
+              static void ensure(Context c) {
+                  try {
+                      JobScheduler js = (JobScheduler) c.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+                      if (js == null) return;
+                      for (JobInfo j : js.getAllPendingJobs()) if (j.getId() == ID_PERIODIC) return;
+                      js.schedule(new JobInfo.Builder(ID_PERIODIC, new ComponentName(c, KeepAliveJob.class))
+                              .setPeriodic(15 * 60 * 1000L)
+                              .setPersisted(true)
+                              .build());
+                  } catch (Exception ignored) { }
+              }
+
+              static void kick(Context c, long delayMs) {
+                  try {
+                      JobScheduler js = (JobScheduler) c.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+                      if (js == null) return;
+                      js.schedule(new JobInfo.Builder(ID_ONCE, new ComponentName(c, KeepAliveJob.class))
+                              .setMinimumLatency(delayMs)
+                              .setOverrideDeadline(delayMs + 60000)
+                              .setPersisted(true)
+                              .build());
+                  } catch (Exception ignored) { }
+              }
+
+              static void cancel(Context c) {
+                  try {
+                      JobScheduler js = (JobScheduler) c.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+                      if (js == null) return;
+                      js.cancel(ID_PERIODIC);
+                      js.cancel(ID_ONCE);
+                  } catch (Exception ignored) { }
+              }
+
+              @Override
+              public boolean onStartJob(JobParameters p) {
+                  try {
+                      if (getSharedPreferences("s", 0).getBoolean("enabled", true)
+                              && !DnsVpnService.running
+                              && VpnService.prepare(this) == null) {
+                          Intent s = new Intent(this, DnsVpnService.class);
+                          if (Build.VERSION.SDK_INT >= 26) startForegroundService(s);
+                          else startService(s);
+                      }
+                  } catch (Exception ignored) { }
+                  return false;
+              }
+
+              @Override
+              public boolean onStopJob(JobParameters p) {
+                  return false;
+              }
+          }
+          EOF
+
+          # ---------------------------------------------------------------
           cat > $D/BootReceiver.java <<'EOF'
-          package com.ayush.Hotblock8481;
+          package com.ayush.StarGuard8481;
 
           import android.content.BroadcastReceiver;
           import android.content.Context;
@@ -606,18 +765,25 @@ jobs:
           public class BootReceiver extends BroadcastReceiver {
               @Override
               public void onReceive(Context c, Intent i) {
-                  if (!c.getSharedPreferences("s", 0).getBoolean("enabled", true)) return;
-                  if (VpnService.prepare(c) != null) return;
-                  Intent s = new Intent(c, DnsVpnService.class);
-                  if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s);
-                  else c.startService(s);
+                  try {
+                      if (!c.getSharedPreferences("s", 0).getBoolean("enabled", true)) return;
+                      KeepAliveJob.ensure(c);
+                      if (DnsVpnService.running) return;
+                      KeepAliveJob.kick(c, 5000);   // backup route in case the direct start below is blocked
+                      if (VpnService.prepare(c) != null) return;
+                      Intent s = new Intent(c, DnsVpnService.class);
+                      try {
+                          if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s);
+                          else c.startService(s);
+                      } catch (Exception ignored) { }
+                  } catch (Exception ignored) { }
               }
           }
           EOF
 
           # ---------------------------------------------------------------
           cat > $D/MainActivity.java <<'EOF'
-          package com.ayush.Hotblock8481;
+          package com.ayush.StarGuard8481;
 
           import android.app.Activity;
           import android.content.Intent;
@@ -747,7 +913,7 @@ jobs:
                   LinearLayout titles = new LinearLayout(this);
                   titles.setOrientation(LinearLayout.VERTICAL);
                   titles.setPadding(dp(20), 0, 0, 0);
-                  TextView title = tv("Hotblock8481", 32, Color.WHITE);
+                  TextView title = tv("StarGuard8481", 32, Color.WHITE);
                   title.setTypeface(Typeface.DEFAULT_BOLD);
                   titles.addView(title);
                   titles.addView(tv("Local DNS ad blocker", 16, MUTED));
@@ -801,9 +967,9 @@ jobs:
                   setContentView(root);
                   btnOn.requestFocus();
 
-                  if (!DnsVpnService.running
-                          && getSharedPreferences("s", 0).getBoolean("enabled", true)) {
-                      startVpn();
+                  if (getSharedPreferences("s", 0).getBoolean("enabled", true)) {
+                      KeepAliveJob.ensure(this);
+                      if (!DnsVpnService.running) startVpn();
                   }
               }
 
@@ -841,7 +1007,7 @@ jobs:
               }
 
               @Override protected void onResume() { super.onResume(); h.post(tick); }
-              @Override protected void onPause() { super.onPause(); h.removeCallbacks(tick); }
+              @Override protected void onPause() { super.onPause(); h.removeCallbacks(tick); Stats.flush(); }
           }
           EOF
 
@@ -896,11 +1062,11 @@ jobs:
               body = ',\n'.join('        "%s"' % digest(x) for x in sorted(items))
               return '    static final String[] %s = {\n%s\n    };' % (name, body)
 
-          java = ('package com.ayush.Hotblock8481;\n\n'
+          java = ('package com.ayush.StarGuard8481;\n\n'
                   'final class BlockData {\n'
                   '    static final String SALT = "%s";\n%s\n%s\n}\n'
                   % (salt, arr('EXACT', exact), arr('WIDE', wide)))
-          with open('app/src/main/java/com/ayush/Hotblock8481/BlockData.java', 'w') as f:
+          with open('app/src/main/java/com/ayush/StarGuard8481/BlockData.java', 'w') as f:
               f.write(java)
           print('Blocklist built from %s: %d exact-host rules, %d domain-wide rules (hashed)'
                 % (source, len(exact), len(wide)))
@@ -911,7 +1077,7 @@ jobs:
           keytool -genkeypair -v -keystore app/release.jks -alias key \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=Hotblock8481, O=Ayush, C=IN"
+            -dname "CN=StarGuard8481, O=Ayush, C=IN"
 
       - name: Build release APK
         run: gradle assembleRelease --no-daemon --stacktrace
@@ -919,10 +1085,10 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk out/Hotblock8481.apk
+          cp app/build/outputs/apk/release/app-release.apk out/StarGuard8481.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Hotblock8481-apk
-          path: out/Hotblock8481.apk
+          name: StarGuard8481-apk
+          path: out/StarGuard8481.apk
