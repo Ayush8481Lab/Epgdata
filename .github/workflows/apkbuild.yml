@@ -7,7 +7,7 @@ name: Build StarGuard8481 APK
 # ---------------------------------------------------------------------------
 # WHERE TO EDIT
 #   1) Block list  -> BLOCK_DOMAINS_DEFAULT below (JSON array, one domain per line)
-#      PRIVATE option (recommended if the repo is public): add a repository secret
+#      PRIVATE option (recommended if the repo is pulic): add a repository secret
 #      named BLOCK_DOMAINS (Settings > Secrets and variables > Actions) with the
 #      same JSON array. If the secret exists it overrides the list below.
 #   2) Logos       -> LOGO_SQUARE_URL (1:1 app icon) and LOGO_WIDE_URL (16:9 TV banner)
